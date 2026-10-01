@@ -1,54 +1,120 @@
-
 package android_app
 
-import retrofit2.Call
+import com.google.gson.annotations.SerializedName
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
 
-// Google Places & Directions Interface
-interface GoogleApiService {
-    @GET("maps/api/place/textsearch/json")
-    fun searchPlaces(
-        @Query("query") query: String,
-        @Query("type") type: String?,
-        @Query("key") apiKey: String
-    ): Call<PlacesSearchResponse>
-
-    @GET("maps/api/place/details/json")
-    fun getPlaceDetail(
-        @Query("place_id") placeId: String,
-        @Query("fields") fields: String = "name,rating,formatted_address,price_level,geometry,opening_hours,photos,reviews",
-        @Query("key") apiKey: String
-    ): Call<PlaceDetailResponse>
-}
-
-// OpenWeatherMap API Interface
+// ==========================================
+// 1. OPENWEATHERMAP SERVICE & MODELS
+// ==========================================
 interface WeatherApiService {
+
     @GET("data/2.5/weather")
-    fun getWeatherByCoordinates(
+    suspend fun getCurrentWeather(
         @Query("lat") lat: Double,
         @Query("lon") lon: Double,
+        @Query("appid") apiKey: String,
         @Query("units") units: String = "metric",
-        @Query("appid") apiKey: String
-    ): Call<WeatherResponse>
+        @Query("lang") lang: String = "vi"
+    ): WeatherResponse
+
+    companion object {
+        private const val BASE_URL = "https://api.openweathermap.org/"
+
+        fun create(): WeatherApiService {
+            return Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(WeatherApiService::class.java)
+        }
+    }
 }
 
-object RetrofitClient {
-    fun createGoogleApi(): GoogleApiService {
-        return Retrofit.Builder()
-            .baseUrl("https://maps.googleapis.com/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(GoogleApiService::class.java)
-    }
+// ==========================================
+// 2. WIKIPEDIA SERVICE & MODELS (LẤY ẢNH ĐỊA DANH)
+// ==========================================
+data class WikiResponse(
+    @SerializedName("query") val query: WikiQuery? = null
+)
 
-    fun createWeatherApi(): WeatherApiService {
-        return Retrofit.Builder()
-            .baseUrl("https://api.openweathermap.org/")
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(WeatherApiService::class.java)
+data class WikiQuery(
+    @SerializedName("pages") val pages: Map<String, WikiPage>? = null
+)
+
+data class WikiPage(
+    @SerializedName("pageid") val pageId: Long? = null,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("thumbnail") val thumbnail: WikiThumbnail? = null
+)
+
+data class WikiThumbnail(
+    @SerializedName("source") val source: String? = null,
+    @SerializedName("width") val width: Int = 0,
+    @SerializedName("height") val height: Int = 0
+)
+data class GeminiRequest(
+    val contents: List<GeminiContent>
+)
+
+data class GeminiContent(
+    val parts: List<GeminiPart>
+)
+
+data class GeminiPart(
+    val text: String
+)
+
+data class GeminiResponse(
+    val candidates: List<GeminiCandidate>? = null
+)
+
+data class GeminiCandidate(
+    val content: GeminiContent? = null
+)
+
+interface GeminiApiService {
+    @retrofit2.http.POST("v1beta/models/gemini-1.5-flash:generateContent")
+    suspend fun generateContent(
+        @retrofit2.http.Query("key") apiKey: String,
+        @retrofit2.http.Body request: GeminiRequest
+    ): GeminiResponse
+
+    companion object {
+        private const val BASE_URL = "https://generativelanguage.googleapis.com/"
+
+        fun create(): GeminiApiService {
+            return retrofit2.Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .addConverterFactory(retrofit2.converter.gson.GsonConverterFactory.create())
+                .build()
+                .create(GeminiApiService::class.java)
+        }
+    }
+}
+
+interface WikipediaApiService {
+
+    @GET("w/api.php")
+    suspend fun fetchPlaceImage(
+        @Query("action") action: String = "query",
+        @Query("prop") prop: String = "pageimages",
+        @Query("format") format: String = "json",
+        @Query("pithumbsize") thumbSize: Int = 600,
+        @Query("titles") title: String
+    ): WikiResponse
+
+    companion object {
+        private const val BASE_URL = "https://vi.wikipedia.org/"
+
+        fun create(): WikipediaApiService {
+            return Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(WikipediaApiService::class.java)
+        }
     }
 }

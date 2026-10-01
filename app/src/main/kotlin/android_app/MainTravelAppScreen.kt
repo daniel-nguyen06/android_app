@@ -5,7 +5,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,16 +17,16 @@ import android_app.ui.theme.TravelAppTheme
 
 /**
  * Danh sách các Tab điều hướng của Ứng dụng Du lịch
+ * Dùng bộ Icons mặc định có sẵn trong compose-material core
  */
 enum class TravelTab(
     val title: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
+    val icon: ImageVector
 ) {
-    EXPLORE("Khám phá", Icons.Filled.Explore, Icons.Outlined.Explore),
-    FAVORITES("Yêu thích", Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder),
-    TRIPS("Chuyến đi", Icons.Filled.Luggage, Icons.Outlined.Luggage),
-    PROFILE("Tài khoản", Icons.Filled.Person, Icons.Outlined.Person)
+    EXPLORE("Khám phá", Icons.Default.Search),
+    FAVORITES("Yêu thích", Icons.Default.Favorite),
+    TRIPS("Chuyến đi", Icons.Default.Place),
+    PROFILE("Tài khoản", Icons.Default.Person)
 }
 
 /**
@@ -54,7 +53,7 @@ fun MainTravelAppScreen(
                         label = { Text(tab.title) },
                         icon = {
                             Icon(
-                                imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                imageVector = tab.icon,
                                 contentDescription = tab.title
                             )
                         }
@@ -71,7 +70,11 @@ fun MainTravelAppScreen(
         ) {
             when (selectedTab) {
                 TravelTab.EXPLORE -> {
-                    PlaceDiscoveryRoute(viewModel = viewModel)
+                    val uiState by viewModel.uiState.collectAsState()
+                    PlaceDiscoveryScreen(
+                        uiState = uiState,
+                        onEvent = { event -> viewModel.onEvent(event) }
+                    )
                 }
                 TravelTab.FAVORITES -> {
                     FavoritesTabScreen(viewModel = viewModel)
@@ -116,7 +119,7 @@ fun FavoritesTabScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        imageVector = Icons.Outlined.FavoriteBorder,
+                        imageVector = Icons.Default.FavoriteBorder,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.outline
@@ -172,7 +175,7 @@ fun TripsTabScreen(modifier: Modifier = Modifier) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
-                imageVector = Icons.Default.Luggage,
+                imageVector = Icons.Default.Place,
                 contentDescription = null,
                 modifier = Modifier.size(72.dp),
                 tint = MaterialTheme.colorScheme.primary
@@ -257,7 +260,7 @@ fun ProfileTabScreen(modifier: Modifier = Modifier) {
 @Preview(name = "Main Screen - Light Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenLightPreview() {
-    val sampleRepo = PlaceRepository(PlacesApiService.create(), "")
+    val sampleRepo = PlaceRepository(PlacesApiService.create())
     val sampleVM = PlaceViewModel(sampleRepo)
     TravelAppTheme(darkTheme = false) {
         MainTravelAppScreen(viewModel = sampleVM)
@@ -267,7 +270,7 @@ fun MainTravelAppScreenLightPreview() {
 @Preview(name = "Main Screen - Dark Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenDarkPreview() {
-    val sampleRepo = PlaceRepository(PlacesApiService.create(), "")
+    val sampleRepo = PlaceRepository(PlacesApiService.create())
     val sampleVM = PlaceViewModel(sampleRepo)
     TravelAppTheme(darkTheme = true) {
         MainTravelAppScreen(viewModel = sampleVM)

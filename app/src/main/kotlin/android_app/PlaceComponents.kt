@@ -10,37 +10,34 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android_app.ui.theme.TravelAppTheme
 
-/**
- * Các thành phần Giao diện Compose (Material 3) tái sử dụng cho ứng dụng Du lịch.
- */
-
 // Danh mục địa điểm phổ biến
-data class PlaceCategory(val id: String?, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+data class PlaceCategory(
+    val id: String?,
+    val label: String,
+    val icon: ImageVector
+)
 
 val placeCategories = listOf(
-    PlaceCategory(null, "Tất cả", Icons.Default.Public),
-    PlaceCategory("tourist_attraction", "Tham quan", Icons.Default.PhotoCamera),
-    PlaceCategory("lodging", "Khách sạn", Icons.Default.Hotel),
-    PlaceCategory("restaurant", "Nhà hàng", Icons.Default.Restaurant),
-    PlaceCategory("cafe", "Cà phê", Icons.Default.LocalCafe),
-    PlaceCategory("shopping_mall", "Mua sắm", Icons.Default.ShoppingBag),
-    PlaceCategory("amusement_park", "Vui chơi", Icons.Default.Attractions)
+    PlaceCategory(id = null, label = "Tất cả", Icons.Default.Place),
+    PlaceCategory(id = "tourist_attraction", label = "Tham quan", Icons.Default.Star),
+    PlaceCategory(id = "lodging", label = "Khách sạn", Icons.Default.Home),
+    PlaceCategory(id = "restaurant", label = "Nhà hàng", Icons.Default.ThumbUp),
+    PlaceCategory(id = "cafe", label = "Cà phê", Icons.Default.Favorite),
+    PlaceCategory(id = "shopping_mall", label = "Mua sắm", Icons.Default.ShoppingCart),
+    PlaceCategory(id = "amusement_park", label = "Vui chơi", Icons.Default.PlayArrow)
 )
 
 /**
@@ -77,6 +74,7 @@ fun CategoryChipRow(
 
 /**
  * Thanh Bộ Lọc Nâng Cao & Tùy Chọn Sắp Xếp (Sort & Filter Bar)
+ * Dùng PlaceRepository.SortType để đồng bộ với ViewModel và UiState
  */
 @Composable
 fun FilterAndSortBar(
@@ -99,7 +97,7 @@ fun FilterAndSortBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Nút chọn sắp xếp
+        // Nút Sắp xếp
         Box {
             AssistChip(
                 onClick = { showSortMenu = true },
@@ -112,7 +110,7 @@ fun FilterAndSortBar(
                     Text("Sắp xếp: $sortText")
                 },
                 leadingIcon = {
-                    Icon(Icons.Default.Sort, contentDescription = "Sort", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Menu, contentDescription = "Sort", modifier = Modifier.size(18.dp))
                 },
                 trailingIcon = {
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null)
@@ -129,7 +127,7 @@ fun FilterAndSortBar(
                         onSortTypeChanged(PlaceRepository.SortType.RATING_DESC)
                         showSortMenu = false
                     },
-                    leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) }
+                    leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) }
                 )
                 DropdownMenuItem(
                     text = { Text("Khoảng cách gần nhất") },
@@ -137,7 +135,7 @@ fun FilterAndSortBar(
                         onSortTypeChanged(PlaceRepository.SortType.DISTANCE)
                         showSortMenu = false
                     },
-                    leadingIcon = { Icon(Icons.Outlined.LocationOn, contentDescription = null) }
+                    leadingIcon = { Icon(Icons.Default.Place, contentDescription = null) }
                 )
                 DropdownMenuItem(
                     text = { Text("Giá cả hợp lý nhất") },
@@ -145,21 +143,21 @@ fun FilterAndSortBar(
                         onSortTypeChanged(PlaceRepository.SortType.PRICE_ASC)
                         showSortMenu = false
                     },
-                    leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) }
+                    leadingIcon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) }
                 )
             }
         }
 
-        // Nút mở Dialog bộ lọc chi tiết
+        // Nút mở Dialog Bộ lọc
         FilterChip(
             selected = minRating > 0 || maxPriceLevel < 4,
             onClick = { showFilterDialog = true },
             label = { Text("Bộ lọc") },
-            leadingIcon = { Icon(Icons.Default.FilterList, contentDescription = "Filter", modifier = Modifier.size(18.dp)) }
+            leadingIcon = { Icon(Icons.Default.List, contentDescription = "Filter", modifier = Modifier.size(18.dp)) }
         )
     }
 
-    // Dialog Bộ Lọc Chi Tiết
+    // Dialog Bộ lọc chi tiết
     if (showFilterDialog) {
         AlertDialog(
             onDismissRequest = { showFilterDialog = false },
@@ -215,10 +213,7 @@ fun PlaceCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        )
+        shape = RoundedCornerShape(16.dp)
     ) {
         Row(
             modifier = Modifier
@@ -226,7 +221,6 @@ fun PlaceCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon / Ảnh đại diện
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -236,9 +230,9 @@ fun PlaceCard(
             ) {
                 Icon(
                     imageVector = when {
-                        place.types.contains("lodging") -> Icons.Default.Hotel
-                        place.types.contains("restaurant") -> Icons.Default.Restaurant
-                        place.types.contains("cafe") -> Icons.Default.LocalCafe
+                        place.types.contains("lodging") -> Icons.Default.Home
+                        place.types.contains("restaurant") -> Icons.Default.ThumbUp
+                        place.types.contains("cafe") -> Icons.Default.Favorite
                         else -> Icons.Default.Place
                     },
                     contentDescription = null,
@@ -249,7 +243,6 @@ fun PlaceCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Thông tin chi tiết
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -265,7 +258,7 @@ fun PlaceCard(
                 place.vicinity?.let {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Outlined.LocationOn,
+                            imageVector = Icons.Default.Place,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
                             tint = MaterialTheme.colorScheme.secondary
@@ -285,7 +278,6 @@ fun PlaceCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Badge Rating
                     Surface(
                         color = MaterialTheme.colorScheme.secondaryContainer,
                         shape = RoundedCornerShape(6.dp)
@@ -309,7 +301,6 @@ fun PlaceCard(
                         }
                     }
 
-                    // Mức giá ($$$)
                     if (place.priceLevel > 0) {
                         Text(
                             text = "$".repeat(place.priceLevel),
@@ -319,7 +310,6 @@ fun PlaceCard(
                         )
                     }
 
-                    // Khoảng cách (km)
                     if (place.distanceInKm > 0) {
                         Text(
                             text = "• ${place.distanceInKm} km",
@@ -330,10 +320,9 @@ fun PlaceCard(
                 }
             }
 
-            // Nút Thêm vào Yêu thích
             IconButton(onClick = onToggleFavorite) {
                 Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = "Favorite",
                     tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.outline
                 )
@@ -343,7 +332,7 @@ fun PlaceCard(
 }
 
 /**
- * Trạng thái Đang Tải Dữ Liệu (Loading State)
+ * Trạng thái Đang Tải Dữ Liệu
  */
 @Composable
 fun LoadingStateView(modifier: Modifier = Modifier) {
@@ -354,21 +343,17 @@ fun LoadingStateView(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        CircularProgressIndicator(
-            color = MaterialTheme.colorScheme.primary,
-            strokeWidth = 4.dp
-        )
+        CircularProgressIndicator(strokeWidth = 4.dp)
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Đang tìm kiếm địa điểm tốt nhất...",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "Đang tìm kiếm địa điểm...",
+            style = MaterialTheme.typography.bodyLarge
         )
     }
 }
 
 /**
- * Trạng thái Không Tìm Thấy Kết Quả (Empty State)
+ * Trạng thái Không Tìm Thấy Kết Quả
  */
 @Composable
 fun EmptyStateView(
@@ -383,7 +368,7 @@ fun EmptyStateView(
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Default.SearchOff,
+            imageVector = Icons.Default.Search,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.outline
@@ -393,12 +378,6 @@ fun EmptyStateView(
             text = "Không tìm thấy địa điểm nào",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Hãy thử thay đổi từ khóa hoặc điều chỉnh lại bộ lọc đánh giá / giá tiền.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(modifier = Modifier.height(24.dp))
         OutlinedButton(onClick = onClearFilters) {
@@ -410,7 +389,7 @@ fun EmptyStateView(
 }
 
 /**
- * Trạng thái Lỗi Kết Nối / Xử Lý (Error State)
+ * Trạng thái Lỗi Kết Nối
  */
 @Composable
 fun ErrorStateView(
@@ -426,29 +405,19 @@ fun ErrorStateView(
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Default.ErrorOutline,
+            imageVector = Icons.Default.Warning,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.error
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Đã xảy ra lỗi",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.error,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
             text = errorMessage,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.error
         )
         Spacer(modifier = Modifier.height(24.dp))
-        Button(
-            onClick = onRetry,
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-        ) {
+        Button(onClick = onRetry) {
             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text("Thử lại")
@@ -457,7 +426,7 @@ fun ErrorStateView(
 }
 
 /**
- * Modal BottomSheet Xem Chi Tiết Địa Điểm (Mục 3)
+ * Modal BottomSheet Chi Tiết Địa Điểm
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -477,7 +446,6 @@ fun PlaceDetailBottomSheet(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header: Tên & Nút Favorite
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -499,7 +467,7 @@ fun PlaceDetailBottomSheet(
                 }
                 IconButton(onClick = onToggleFavorite) {
                     Icon(
-                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Favorite",
                         tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.outline
                     )
@@ -508,7 +476,6 @@ fun PlaceDetailBottomSheet(
 
             HorizontalDivider()
 
-            // Chi tiết thông tin
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
@@ -520,12 +487,12 @@ fun PlaceDetailBottomSheet(
                     tint = Color(0xFFFFB800)
                 )
                 DetailInfoItem(
-                    icon = Icons.Default.AttachMoney,
+                    icon = Icons.Default.ShoppingCart,
                     title = "Mức giá",
-                    value = if (place.priceLevel > 0) "$".repeat(place.priceLevel) else "Miễn phí/Chưa rõ"
+                    value = if (place.priceLevel > 0) "$".repeat(place.priceLevel) else "Chưa rõ"
                 )
                 DetailInfoItem(
-                    icon = Icons.Outlined.LocationOn,
+                    icon = Icons.Default.Place,
                     title = "Khoảng cách",
                     value = "${place.distanceInKm} km"
                 )
@@ -533,7 +500,6 @@ fun PlaceDetailBottomSheet(
 
             HorizontalDivider()
 
-            // Các hành động
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -545,7 +511,7 @@ fun PlaceDetailBottomSheet(
                     Text("Đóng")
                 }
                 Button(
-                    onClick = { /* Mở bản đồ / Thêm vào Lịch trình */ },
+                    onClick = { /* Tạo chuyến đi */ },
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -559,7 +525,7 @@ fun PlaceDetailBottomSheet(
 
 @Composable
 private fun DetailInfoItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     value: String,
     tint: Color = MaterialTheme.colorScheme.primary
@@ -569,70 +535,5 @@ private fun DetailInfoItem(
         Spacer(modifier = Modifier.height(4.dp))
         Text(text = title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
         Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// PREVIEWS FOR COMPONENTS
-// ---------------------------------------------------------------------------
-
-@Preview(name = "Place Card - Light Mode", showBackground = true)
-@Composable
-fun PlaceCardLightPreview() {
-    TravelAppTheme(darkTheme = false) {
-        PlaceCard(
-            place = PlaceItem(
-                placeId = "1",
-                name = "Chợ Bến Thành",
-                rating = 4.5,
-                priceLevel = 2,
-                vicinity = "Quận 1, Thành phố Hồ Chí Minh",
-                types = listOf("tourist_attraction")
-            ).apply { distanceInKm = 1.2 },
-            isFavorite = true,
-            onToggleFavorite = {},
-            onClick = {},
-            modifier = Modifier.padding(16.dp)
-        )
-    }
-}
-
-@Preview(name = "Place Card - Dark Mode", showBackground = true)
-@Composable
-fun PlaceCardDarkPreview() {
-    TravelAppTheme(darkTheme = true) {
-        PlaceCard(
-            place = PlaceItem(
-                placeId = "2",
-                name = "Khách sạn Rex Saigon",
-                rating = 4.8,
-                priceLevel = 4,
-                vicinity = "141 Nguyễn Huệ, Quận 1",
-                types = listOf("lodging")
-            ).apply { distanceInKm = 0.5 },
-            isFavorite = false,
-            onToggleFavorite = {},
-            onClick = {},
-            modifier = Modifier.padding(16.dp)
-        )
-    }
-}
-
-@Preview(name = "Empty State - Light Mode", showBackground = true)
-@Composable
-fun EmptyStateViewPreview() {
-    TravelAppTheme {
-        EmptyStateView(onClearFilters = {})
-    }
-}
-
-@Preview(name = "Error State - Light Mode", showBackground = true)
-@Composable
-fun ErrorStateViewPreview() {
-    TravelAppTheme {
-        ErrorStateView(
-            errorMessage = "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối Internet.",
-            onRetry = {}
-        )
     }
 }

@@ -2,110 +2,41 @@ package android_app
 
 import com.google.gson.annotations.SerializedName
 
-// --- 1. User & Auth ---
-data class UserProfile(
-        val uid: String,
-        val email: String,
-        val displayName: String = "",
-        val preferences: List<String> = emptyList() // thiên nhiên, ăn uống, mua sắm...
+// --- GEOAPIFY RESPONSE MODELS ---
+data class GeoapifyResponse(
+        @SerializedName("features") val features: List<GeoapifyFeature> = emptyList()
 )
 
-// --- 2 & 3. Places API Models ---
-data class PlacesSearchResponse(
-        @SerializedName("results") val results: List<PlaceItem>,
-        @SerializedName("status") val status: String
+data class GeoapifyFeature(
+        @SerializedName("properties") val properties: GeoapifyProperties? = null
 )
 
-data class PlaceDetailResponse(
-        @SerializedName("result") val result: PlaceDetailItem?,
-        @SerializedName("status") val status: String
+data class GeoapifyProperties(
+        @SerializedName("place_id") val placeId: String? = null,
+        @SerializedName("name") val name: String? = null,
+        @SerializedName("formatted") val formatted: String? = null,
+        @SerializedName("address_line1") val addressLine1: String? = null,
+        @SerializedName("address_line2") val addressLine2: String? = null,
+        @SerializedName("city") val city: String? = null,
+        @SerializedName("country") val country: String? = null,
+        @SerializedName("categories") val categories: List<String> = emptyList(),
+        @SerializedName("opening_hours") val openingHours: String? = null,
+        @SerializedName("website") val website: String? = null,
+        @SerializedName("contact") val contact: GeoapifyContact? = null,
+        @SerializedName("distance") val distanceMeters: Double? = null,
+        @SerializedName("lat") val lat: Double = 0.0,
+        @SerializedName("lon") val lon: Double = 0.0
 )
 
-data class PlaceItem(
-        @SerializedName("place_id") val placeId: String,
-        @SerializedName("name") val name: String,
-        @SerializedName("rating") val rating: Double = 0.0,
-        @SerializedName("price_level") val priceLevel: Int = 1,
-        @SerializedName("types") val types: List<String> = emptyList(),
-        @SerializedName("geometry") val geometry: Geometry? = null
-) {
-    var distanceInKm: Double = 0.0
-}
-
-data class PlaceDetailItem(
-        @SerializedName("place_id") val placeId: String,
-        @SerializedName("name") val name: String,
-        @SerializedName("rating") val rating: Double = 0.0,
-        @SerializedName("formatted_address") val formattedAddress: String? = null,
-        @SerializedName("price_level") val priceLevel: Int = 1,
-        @SerializedName("geometry") val geometry: Geometry? = null,
-        @SerializedName("opening_hours") val openingHours: OpeningHours? = null,
-        @SerializedName("photos") val photos: List<PlacePhoto>? = null,
-        @SerializedName("reviews") val reviews: List<PlaceReview>? = null
-) {
-    var distanceInKm: Double = 0.0
-    var estimatedBudget: String = ""
-}
-
-data class Geometry(@SerializedName("location") val location: LatLng)
-
-data class LatLng(@SerializedName("lat") val lat: Double, @SerializedName("lng") val lng: Double)
-
-data class OpeningHours(@SerializedName("weekday_text") val weekdayText: List<String>? = null)
-
-data class PlacePhoto(@SerializedName("photo_reference") val photoReference: String)
-
-data class PlaceReview(
-        @SerializedName("author_name") val authorName: String,
-        @SerializedName("rating") val rating: Double,
-        @SerializedName("text") val text: String
+data class GeoapifyContact(
+        @SerializedName("phone") val phone: String? = null
 )
 
-// --- 6, 7, 8, 9. Trip, Budget & Itinerary ---
-data class TripPlan(
-        val tripId: String,
-        val title: String,
-        val destination: String,
-        val startDate: Long,
-        val endDate: Long,
-        val totalBudget: Double,
-        val memberCount: Int
-)
-
-data class BudgetAllocation(
-        val totalBudget: Double,
-        val hotelBudget: Double, // 35%
-        val foodBudget: Double, // 30%
-        val transportBudget: Double, // 20%
-        val activityBudget: Double // 15%
-)
-
-data class ExpenseItem(
-        val id: String,
-        val category: String, // "food", "hotel", "transport", "other"
-        val amount: Double,
-        val timestamp: Long
-)
-
-data class BudgetStatus(val budget: Double, val spent: Double, val remaining: Double)
-
-data class ItineraryStop(
-        val order: Int,
-        val place: PlaceItem,
-        val estimatedVisitDurationMinutes: Int = 90,
-        val distanceFromPreviousKm: Double = 0.0
-)
-
-// --- 11. Weather API Models ---
+// --- WEATHER MODELS (OpenWeatherMap) ---
 data class WeatherResponse(
-        @SerializedName("main") val main: WeatherMain,
-        @SerializedName("weather") val weather: List<WeatherDescription>,
-        @SerializedName("name") val cityName: String
-)
-
-data class WeatherMain(
-        @SerializedName("temp") val temp: Double,
-        @SerializedName("humidity") val humidity: Int
+        @SerializedName("weather") val weather: List<WeatherDescription> = emptyList(),
+        @SerializedName("main") val main: MainWeatherData? = null,
+        @SerializedName("name") val cityName: String? = null
 )
 
 data class WeatherDescription(
@@ -113,41 +44,26 @@ data class WeatherDescription(
         @SerializedName("icon") val icon: String
 )
 
-// --- 12. Check-in ---
-data class CheckInPost(
-        val id: String,
-        val userId: String,
-        val placeName: String,
-        val photoUrl: String,
-        val caption: String,
-        val timestamp: Long
+data class MainWeatherData(
+        @SerializedName("temp") val temp: Double,
+        @SerializedName("humidity") val humidity: Int
 )
 
-// --- 13. Note / Checklist ---
-data class TripNote(
-        val id: String,
-        val title: String,
-        val content: String,
-        val isCompleted: Boolean = false
-)
-
-// --- 14. Review / Rating ---
-data class UserReview(
-        val id: String,
+// --- MODEL HIỂN THỊ TRÊN UI ---
+data class PlaceItem(
         val placeId: String,
-        val userId: String,
-        val rating: Double,
-        val comment: String,
-        val createdAt: Long
+        val name: String,
+        val vicinity: String?,
+        val rating: Double = 4.5,
+        val priceLevel: Int = 2,
+        val estimatedBudget: String = "35.000đ - 70.000đ",
+        val openingHours: String = "07:30 - 22:30",
+        val description: String = "Địa điểm phổ biến, phục vụ chu đáo.",
+        val imageUrl: String = "",
+        val types: List<String> = emptyList(),
+        val geometry: Geometry? = null,
+        var distanceInKm: Double = 0.0
 )
 
-// --- 15. Travel Journal Summary ---
-data class JournalSummary(
-        val tripId: String,
-        val durationDays: Long,
-        val totalPlacesVisited: Int,
-        val totalPhotosCount: Int,
-        val totalCost: Double,
-        val totalDistanceKm: Double,
-        val visitedPlaces: List<String>
-)
+data class Geometry(val location: LatLng? = null)
+data class LatLng(val lat: Double, val lng: Double)
