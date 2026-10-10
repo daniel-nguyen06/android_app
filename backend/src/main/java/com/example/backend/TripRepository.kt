@@ -39,7 +39,7 @@ class TripRepository {
         require(trip.name.isNotBlank()) {
             "Tên chuyến đi không được để trống"
         }
-        require(trip.budget >= 0L) {
+        require(trip.budget >= 0.0) {
             "Ngân sách không được âm"
         }
 
@@ -60,7 +60,7 @@ class TripRepository {
             "currency" to "VND",
             "participantCount" to trip.participantCount,
             "createdAt" to Timestamp.now(),
-            "totalSpent" to 0L
+            "totalSpent" to 0.0
         )
 
         document.set(data).get()
@@ -79,9 +79,10 @@ class TripRepository {
             name = document.getString("name") ?: "",
             startDate = dateToString(document.get("startDate")),
             endDate = dateToString(document.get("endDate")),
-            budget = numberToLong(document.get("budget")),
-            participantCount =
-                numberToLong(document.get("participantCount")).toInt(),
+            budget = (document.get("budget") as? Number)?.toDouble() ?: 0.0,
+            currency = document.getString("currency") ?: "VND",
+            participantCount = (document.get("participantCount") as? Number)?.toInt() ?: 0,
+            totalSpent = (document.get("totalSpent") as? Number)?.toDouble() ?: 0.0,
             createdAt = dateToString(document.get("createdAt"))
         )
     }
@@ -104,12 +105,12 @@ class TripRepository {
         name: String,
         startDate: String,
         endDate: String,
-        budget: Long
+        budget: Double
     ) {
         require(name.isNotBlank()) {
             "Tên chuyến đi không được để trống"
         }
-        require(budget >= 0L) {
+        require(budget >= 0.0) {
             "Ngân sách không được âm"
         }
 

@@ -66,7 +66,7 @@ fun main() {
                     val name = body["name"] as? String ?: ""
                     val startDate = body["startDate"] as? String ?: ""
                     val endDate = body["endDate"] as? String ?: ""
-                    val budget = (body["budget"] as? Number)?.toLong() ?: 0L
+                    val budget = (body["budget"] as? Number)?.toDouble() ?: 0.0
 
                     val tripId = tripRepository.createTrip(
                         Trip(
@@ -119,7 +119,9 @@ fun main() {
                             "startDate" to trip.startDate,
                             "endDate" to trip.endDate,
                             "budget" to trip.budget,
+                            "currency" to trip.currency,
                             "participantCount" to trip.participantCount,
+                            "totalSpent" to trip.totalSpent,
                             "createdAt" to trip.createdAt
                         )
                     )
@@ -161,7 +163,9 @@ fun main() {
                             "startDate" to trip.startDate,
                             "endDate" to trip.endDate,
                             "budget" to trip.budget,
+                            "currency" to trip.currency,
                             "participantCount" to trip.participantCount,
+                            "totalSpent" to trip.totalSpent,
                             "createdAt" to trip.createdAt
                         )
                     ),
@@ -559,6 +563,217 @@ fun main() {
                 }
             }
 
+            // Lấy danh sách khoản chi của chuyến đi
+            get("/trips/{tripId}/expenses") {
+                val tripId = call.parameters["tripId"]
+
+                if (tripId.isNullOrBlank()) {
+                    call.respondText(
+                        """{"error":"Missing tripId"}""",
+                        ContentType.Application.Json,
+                        HttpStatusCode.BadRequest
+                    )
+                    return@get
+                }
+
+                try {
+                    val expenses =
+                        tripExpenseRepository.getExpensesByTrip(tripId)
+
+                    val json = expenses.joinToString(
+                        prefix = "[",
+                        postfix = "]"
+                    ) { expense ->
+                        buildJson(
+                            mapOf(
+                                "expenseId" to expense.expenseId,
+                                "tripId" to expense.tripId,
+                                "title" to expense.title,
+                                "amount" to expense.amount,
+                                "paidBy" to expense.paidBy,
+                                "participantIds" to expense.participantIds,
+                                "splitType" to expense.splitType,
+                                "tripPlaceId" to expense.tripPlaceId,
+                                "createdAt" to expense.createdAt
+                            )
+                        )
+                    }
+
+                    call.respondText(
+                        json,
+                        ContentType.Application.Json
+                    )
+                } catch (e: Exception) {
+                    call.respondText(
+                        buildJson(
+                            mapOf("error" to (e.message ?: "Unknown error"))
+                        ),
+                        ContentType.Application.Json,
+                        HttpStatusCode.InternalServerError
+                    )
+                }
+            }
+
+            post("/trips/{tripId}/expenses") {
+                val tripId = call.parameters["tripId"]
+
+                if (tripId.isNullOrBlank()) {
+                    call.respondText(
+                        """{"error":"tripId không hợp lệ"}""",
+                        ContentType.Application.Json,
+                        HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+
+                try {
+                    val body = call.receiveText()
+                    val json = com.google.gson.JsonParser.parseString(body).asJsonObject
+
+                    val title = json.get("title")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                    val amount = json.get("amount")?.takeIf { !it.isJsonNull }?.asDouble ?: 0.0
+                    val paidBy = json.get("paidBy")?.takeIf { !it.isJsonNull }?.asString ?: ""
+                    val splitType = json.get("splitType")?.takeIf { !it.isJsonNull }?.asString ?: "equal"
+                    val tripPlaceId = json.get("tripPlaceId")?.takeIf { !it.isJsonNull }?.asString ?: ""
+
+                    val participantIds = json.getAsJsonArray("participantIds")
+                        ?.map { it.asString }
+                        ?: emptyList()
+
+                    val expenseId = tripExpenseRepository.addExpense(
+                        tripId = tripId,
+                        title = title,
+                        amount = amount,
+                        paidBy = paidBy,
+                        participantIds = participantIds,
+                        splitType = splitType,
+                        tripPlaceId = tripPlaceId
+                    )
+
+                    call.respondText(
+                        buildJson(mapOf(
+                            "message" to "Thêm khoản chi thành công",
+                            "expenseId" to expenseId
+                        )),
+                        ContentType.Application.Json,
+                        HttpStatusCode.Created
+                    )
+                } catch (e: IllegalArgumentException) {
+                    call.respondText(
+                        buildJson(mapOf("error" to (e.message ?: "Dữ liệu không hợp lệ"))),
+                        ContentType.Application.Json,
+                        HttpStatusCode.BadRequest
+                    )
+                } catch (e: Exception) {
+                    call.respondText(
+                        buildJson(mapOf("error" to (e.message ?: "Lỗi máy chủ"))),
+                        ContentType.Application.Json,
+                        HttpStatusCode.InternalServerError
+                    )
+                }
+            }
+
+            delete("/trips/{tripId}/expenses/{expenseId}") {
+                val tripId = call.parameters["tripId"]
+                val expenseId = call.parameters["expenseId"]
+
+                if (tripId.isNullOrBlank() || expenseId.isNullOrBlank()) {
+                    call.respondText(
+                        buildJson(mapOf("message" to "Thiếu tripId hoặc expenseId")),
+                        ContentType.Application.Json,
+                        HttpStatusCode.BadRequest
+                    )
+                    return@delete
+                }
+
+                try {
+                    // Chỉ cho phép xóa khoản chi thuộc chuyến đi này.
+                    val expenseExists = tripExpenseRepository
+                        .getExpensesByTrip(tripId)
+                        .any { it.expenseId == expenseId }
+
+                    if (!expenseExists) {
+                        call.respondText(
+                            buildJson(mapOf("message" to "Không tìm thấy khoản chi trong chuyến đi")),
+                            ContentType.Application.Json,
+                            HttpStatusCode.NotFound
+                        )
+                        return@delete
+                    }
+
+                    tripExpenseRepository.deleteExpense(expenseId)
+
+                    // Đồng bộ lại tổng chi sau khi xóa.
+                    val totalSpent = tripExpenseRepository.syncTotalSpent(tripId)
+
+                    call.respondText(
+                        buildJson(
+                            mapOf(
+                                "tripId" to tripId,
+                                "deletedExpenseId" to expenseId,
+                                "totalSpent" to totalSpent,
+                                "currency" to "VND",
+                                "message" to "Đã xóa khoản chi và cập nhật tổng chi"
+                            )
+                        ),
+                        ContentType.Application.Json,
+                        HttpStatusCode.OK
+                    )
+                } catch (e: Exception) {
+                    call.respondText(
+                        buildJson(mapOf("message" to (e.message ?: "Lỗi máy chủ"))),
+                        ContentType.Application.Json,
+                        HttpStatusCode.InternalServerError
+                    )
+                }
+            }
+
+            // Đồng bộ tổng chi tiêu của chuyến đi
+            post("/trips/{tripId}/expenses/sync-total") {
+                val tripId = call.parameters["tripId"]
+
+                if (tripId.isNullOrBlank()) {
+                    call.respondText(
+                        buildJson(mapOf("error" to "Missing tripId")),
+                        ContentType.Application.Json,
+                        HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+
+                try {
+                    val totalSpent = tripExpenseRepository.syncTotalSpent(tripId)
+
+                    call.respondText(
+                        buildJson(
+                            mapOf(
+                                "tripId" to tripId,
+                                "totalSpent" to totalSpent,
+                                "currency" to "VND",
+                                "message" to "Đồng bộ tổng chi tiêu thành công"
+                            )
+                        ),
+                        ContentType.Application.Json
+                    )
+                } catch (e: IllegalArgumentException) {
+                    call.respondText(
+                        buildJson(
+                            mapOf("error" to (e.message ?: "Dữ liệu không hợp lệ"))
+                        ),
+                        ContentType.Application.Json,
+                        HttpStatusCode.BadRequest
+                    )
+                } catch (e: Exception) {
+                    call.respondText(
+                        buildJson(
+                            mapOf("error" to (e.message ?: "Lỗi máy chủ"))
+                        ),
+                        ContentType.Application.Json,
+                        HttpStatusCode.InternalServerError
+                    )
+                }
+            }
+
             // =========================
             // USERS
             // =========================
@@ -941,27 +1156,33 @@ fun buildJson(data: Map<String, Any?>): String {
  * Chuyển từng kiểu dữ liệu sang JSON.
  */
 fun valueToJson(value: Any?): String {
-
     return when (value) {
-
         null -> "null"
 
-        is String ->
-            "\"${escapeJson(value)}\""
+        is String -> "\"${escapeJson(value)}\""
 
-        is Number, is Boolean ->
-            value.toString()
+        is Number, is Boolean -> value.toString()
 
-        is List<*> ->
+        is Map<*, *> -> {
+            value.entries.joinToString(
+                prefix = "{",
+                postfix = "}"
+            ) { entry ->
+                val key = entry.key?.toString() ?: ""
+                "\"${escapeJson(key)}\":${valueToJson(entry.value)}"
+            }
+        }
+
+        is Iterable<*> -> {
             value.joinToString(
                 prefix = "[",
                 postfix = "]"
-            ) {
-                valueToJson(it)
+            ) { item ->
+                valueToJson(item)
             }
+        }
 
-        else ->
-            "\"${escapeJson(value.toString())}\""
+        else -> "\"${escapeJson(value.toString())}\""
     }
 }
 

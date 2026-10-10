@@ -35,8 +35,10 @@ data class Trip(
     val name: String = "",
     val startDate: String = "",
     val endDate: String = "",
-    val budget: Long = 0L,
+    val budget: Double = 0.0,
+    val currency: String = "VND",
     val participantCount: Int = 0,
+    val totalSpent: Double = 0.0,
     val createdAt: String = ""
 )
 
@@ -59,9 +61,11 @@ data class TripParticipant(
 data class TripExpense(
     val expenseId: String = "",
     val tripId: String = "",
-    val description: String = "",
-    val amount: Long = 0L,
-    val paidByParticipantId: String = "",
-    val splitAmounts: Map<String, Long> = emptyMap(),
+    val title: String = "",
+    val amount: Double = 0.0,
+    val paidBy: String = "",
+    val participantIds: List<String> = emptyList(),
+    val splitType: String = "equal",
+    val tripPlaceId: String = "",
     val createdAt: String = ""
 )
