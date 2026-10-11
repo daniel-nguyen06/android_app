@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import android_app.ui.theme.TravelAppTheme
 
 /**
@@ -27,7 +29,17 @@ enum class TravelTab(
     EXPLORE("Khám phá", Icons.Filled.Explore, Icons.Outlined.Explore),
     FAVORITES("Yêu thích", Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder),
     TRIPS("Chuyến đi", Icons.Filled.Luggage, Icons.Outlined.Luggage),
-    PROFILE("Tài khoản", Icons.Filled.Person, Icons.Outlined.Person)
+    MENU("Menu", Icons.Filled.Menu, Icons.Outlined.Menu)
+}
+
+enum class NavigationRoute {
+    HOME,
+    LOGIN,
+    REGISTER,
+    FIND_LOCATION,
+    CREATE_TRIP,
+    CREATE_ITINERARY,
+    VIEW_ITINERARY
 }
 
 /**
@@ -39,26 +51,86 @@ fun MainTravelAppScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(TravelTab.EXPLORE) }
+    var currentRoute by remember { mutableStateOf(NavigationRoute.LOGIN) } // Start at login for demo
+
+    // If we are not on the home route (tabs), show the full screen sub-routes
+    if (currentRoute != NavigationRoute.HOME) {
+        when (currentRoute) {
+            NavigationRoute.LOGIN -> {
+                android_app.ui.screens.LoginScreen(
+                    onNavigateToHome = { currentRoute = NavigationRoute.HOME },
+                    onNavigateToRegister = { currentRoute = NavigationRoute.REGISTER }
+                )
+            }
+            NavigationRoute.REGISTER -> {
+                android_app.ui.screens.RegisterScreen(
+                    onNavigateToLogin = { currentRoute = NavigationRoute.LOGIN }
+                )
+            }
+            NavigationRoute.FIND_LOCATION -> {
+                android_app.ui.screens.FindLocationScreen(onBack = { currentRoute = NavigationRoute.HOME })
+            }
+            NavigationRoute.CREATE_TRIP -> {
+                android_app.ui.screens.CreateTripScreen(onBack = { currentRoute = NavigationRoute.HOME })
+            }
+            NavigationRoute.CREATE_ITINERARY -> {
+                android_app.ui.screens.CreateItineraryScreen(onBack = { currentRoute = NavigationRoute.HOME })
+            }
+            NavigationRoute.VIEW_ITINERARY -> {
+                android_app.ui.screens.ViewItineraryScreen(onBack = { currentRoute = NavigationRoute.HOME })
+            }
+            else -> {}
+        }
+        return // Return early to not show Scaffold with BottomNav
+    }
 
     Scaffold(
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 8.dp
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                modifier = Modifier.height(72.dp)
             ) {
                 TravelTab.entries.forEach { tab ->
                     val isSelected = selectedTab == tab
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { selectedTab = tab },
-                        label = { Text(tab.title) },
-                        icon = {
-                            Icon(
-                                imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                contentDescription = tab.title
+                    
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable { selectedTab = tab },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Top Border for Active Tab
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .height(3.dp)
+                                    .padding(horizontal = 16.dp)
+                                    .background(MaterialTheme.colorScheme.error) // Red border like sample
                             )
                         }
-                    )
+                        
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                contentDescription = tab.title,
+                                tint = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = tab.title,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -79,8 +151,17 @@ fun MainTravelAppScreen(
                 TravelTab.TRIPS -> {
                     TripsTabScreen()
                 }
-                TravelTab.PROFILE -> {
-                    ProfileTabScreen()
+                TravelTab.MENU -> {
+                    android_app.ui.screens.MenuScreen(
+                        onNavigateToFindLocation = { currentRoute = NavigationRoute.FIND_LOCATION },
+                        onNavigateToCreateTrip = { currentRoute = NavigationRoute.CREATE_TRIP },
+                        onNavigateToCreateItinerary = { currentRoute = NavigationRoute.CREATE_ITINERARY },
+                        onNavigateToViewItinerary = { currentRoute = NavigationRoute.VIEW_ITINERARY },
+                        onLogout = { 
+                            selectedTab = TravelTab.EXPLORE // Reset tab
+                            currentRoute = NavigationRoute.LOGIN // Navigate to login
+                        }
+                    )
                 }
             }
         }
@@ -199,56 +280,7 @@ fun TripsTabScreen(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Tab Tài Khoản
- */
-@Composable
-fun ProfileTabScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(modifier = Modifier.height(32.dp))
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(96.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Người Dùng Du Lịch",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "user@travel.com",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "Cài đặt ứng dụng", fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Ngôn ngữ: Tiếng Việt", style = MaterialTheme.typography.bodySmall)
-                Text(text = "Đơn vị tiền tệ: VND (₫)", style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // PREVIEWS
