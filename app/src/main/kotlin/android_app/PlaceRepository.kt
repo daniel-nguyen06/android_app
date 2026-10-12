@@ -1,13 +1,12 @@
 package android_app
 
+import com.travel.android_app.BuildConfig
 import kotlin.math.*
 
 class PlaceRepository(
     private val apiService: PlacesApiService = PlacesApiService.create(),
-    private val wikiApi: WikipediaApiService = WikipediaApiService.create(),
-    private val aiParser: AiQueryParser = AiQueryParser(geminiApiKey = "AQ.Ab8RN6KN_pdWeE38ANxu9Os1B1JmyzoNWOwU104ckgUj9KEyOw"),
-    private val apiKey: String = "2578b45979c64af6a1c192e486b9181d"
-){
+    private val aiParser: AiQueryParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
+) {
 
     enum class SortType { DISTANCE, RATING_DESC, PRICE_ASC }
 
@@ -21,62 +20,60 @@ class PlaceRepository(
         if (trimmed.isEmpty()) return emptyList()
 
         return try {
-            // 1. Cho Gemini AI phân tích câu gõ tự nhiên của người dùng
+            // 1. Phân tích tự nhiên bằng Gemini AI
             val aiResult = aiParser.parseUserPrompt(trimmed)
             println(">>> [AI Phân tích] Brand: '${aiResult.cleanName}', Category: '${aiResult.category}', LocationHint: '${aiResult.locationHint}'")
 
-            val biasParam = if (userLat != null && userLng != null) {
-                "proximity:$userLng,$userLat"
+            // 2. Chuẩn bị tham số tìm kiếm cho Google Places API
+            val searchQuery = listOfNotNull(aiResult.cleanName, aiResult.category)
+                .joinToString(" ")
+                .ifBlank { trimmed }
+
+            val locationParam = if (userLat != null && userLng != null) {
+                "$userLat,$userLng"
             } else null
 
-            // 2. Ném các trường đã bóc tách vào Geoapify
-            var response = apiService.searchPlaces(
-                categories = aiResult.category,
-                name = aiResult.cleanName,
-                bias = biasParam,
-                apiKey = apiKey
+            val radiusParam = if (locationParam != null) 5000 else null
+
+            // 3. Gọi Google Places API (Không cần truyền API Key vì Interceptor đã tự động đính kèm)
+            val response = apiService.searchPlacesWithGoogle(
+                query = searchQuery,
+                location = locationParam,
+                radius = radiusParam
             )
 
-            // 3. Fallback geocode nếu tìm theo name chính xác chưa ra
-            if (response.features.isEmpty()) {
-                val searchText = aiResult.cleanName ?: trimmed
-                response = apiService.geocodeSearch(
-                    text = searchText,
-                    bias = biasParam,
-                    apiKey = apiKey
-                )
-            }
+            // 4. Map dữ liệu Google sang PlaceItem của ứng dụng
+            response.results.mapNotNull { result ->
+                val name = result.name
+                val lat = result.geometry.location.lat
+                val lng = result.geometry.location.lng
 
-            // 4. Map dữ liệu sang PlaceItem
-            response.features.mapNotNull { feature ->
-                val prop = feature.properties ?: return@mapNotNull null
-                val name = prop.name ?: prop.addressLine1 ?: return@mapNotNull null
-
-                val distKm = when {
-                    prop.distanceMeters != null -> Math.round(prop.distanceMeters / 10.0) / 100.0
-                    userLat != null && userLng != null -> calculateHaversine(userLat, userLng, prop.lat, prop.lon)
-                    else -> 0.0
+                val distKm = if (userLat != null && userLng != null) {
+                    calculateHaversine(userLat, userLng, lat, lng)
+                } else {
+                    0.0
                 }
 
-                val hours = prop.openingHours ?: "07:30 - 22:30 (Hàng ngày)"
-                val isCafe = aiResult.category.contains("cafe")
+                val hours = "07:30 - 22:30 (Hàng ngày)"
+                val isCafe = aiResult.category.contains("cafe", ignoreCase = true)
                 val budget = if (isCafe) "30.000đ - 65.000đ" else "60.000đ - 250.000đ"
-                val calcRating = 4.2 + (abs(prop.placeId.hashCode()) % 8) / 10.0
+                val calcRating = result.rating ?: (4.0 + (abs(result.place_id.hashCode()) % 10) / 10.0)
 
-                val realImageUrl = getWikiImageOrDefault(name, aiResult.category, prop.placeId.hashCode())
+                // Lấy ảnh fallback an toàn
+                val fallbackImageUrl = getFallbackImage(aiResult.category, result.place_id.hashCode())
 
                 PlaceItem(
-                    placeId = prop.placeId ?: java.util.UUID.randomUUID().toString(),
+                    placeId = result.place_id,
                     name = name,
-                    vicinity = prop.formatted ?: "${prop.addressLine1 ?: ""}, ${prop.city ?: "Việt Nam"}",
+                    vicinity = result.formatted_address ?: "Việt Nam",
                     rating = calcRating,
-                    priceLevel = 2,
+                    priceLevel = result.price_level ?: 2,
                     estimatedBudget = budget,
                     openingHours = hours,
-                    description = "Quán có đánh giá cao. Liên hệ: ${prop.contact?.phone ?: prop.website ?: "Đang cập nhật"}",
-                    imageUrl = realImageUrl,
-                    types = prop.categories,
-                    geometry = Geometry(location = LatLng(prop.lat, prop.lon)),
+                    description = "Địa điểm nổi bật trên Google Maps.",
+                    imageUrl = fallbackImageUrl,
+                    types = result.types ?: emptyList(),
+                    geometry = Geometry(location = LatLng(lat, lng)),
                     distanceInKm = distKm
                 )
             }.sortedBy { it.distanceInKm }
@@ -87,27 +84,16 @@ class PlaceRepository(
         }
     }
 
-    private suspend fun getWikiImageOrDefault(placeName: String, category: String, seed: Int): String {
-        return try {
-            val response = wikiApi.fetchPlaceImage(title = placeName)
-            val pages = response.query?.pages
-            val thumbUrl = pages?.values?.firstOrNull()?.thumbnail?.source
-            if (!thumbUrl.isNullOrBlank()) thumbUrl else getFallbackImage(category, seed)
-        } catch (e: Exception) {
-            getFallbackImage(category, seed)
-        }
-    }
-
     private fun getFallbackImage(category: String, seed: Int): String {
-        val fallbackImages = if (category.contains("cafe")) {
+        val fallbackImages = if (category.contains("cafe", ignoreCase = true)) {
             listOf(
-                "[https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800](https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800)",
-                "[https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800](https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800)"
+                "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=800",
+                "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800"
             )
         } else {
             listOf(
-                "[https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800](https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800)",
-                "[https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800](https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800)"
+                "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800",
+                "https://images.unsplash.com/photo-1552566626-52f8b828add9?w=800"
             )
         }
         return fallbackImages[abs(seed) % fallbackImages.size]
@@ -141,6 +127,7 @@ class PlaceRepository(
         val dLon = Math.toRadians(lon2 - lon1)
         val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
         return Math.round(r * c * 100.0) / 100.0
     }
 }

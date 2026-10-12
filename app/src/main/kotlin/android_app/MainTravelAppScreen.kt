@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import android_app.ui.theme.TravelAppTheme
+import com.travel.android_app.BuildConfig
 
 /**
 - Danh sách các Tab điều hướng của Ứng dụng Du lịch
@@ -287,12 +288,12 @@ fun TripsTabScreen(modifier: Modifier = Modifier) {
 @Preview(name = "Main Screen - Light Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenLightPreview() {
-    val geminiKey = "AQ.Ab8RN6KN_pdWeE38ANxu9Os1B1JmyzoNWOwU104ckgUj9KEyOw"
-    val geoapifyKey = "2578b45979c64af6a1c192e486b9181d"
+    val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
 
-    val aiParser = AiQueryParser(geminiApiKey = geminiKey)
-    val sampleRepo = PlaceRepository(apiKey = geoapifyKey, aiParser = aiParser)
-    val sampleVM = PlaceViewModel(sampleRepo)
+    // 2. Bỏ tham số apiKey cũ vì PlaceRepository bản Google Maps không cần nữa
+    val sampleRepo = PlaceRepository(aiParser = aiParser)
+
+    val sampleVM = PlaceViewModel(repository = sampleRepo)
 
     TravelAppTheme(darkTheme = false) {
         MainTravelAppScreen(viewModel = sampleVM)
@@ -302,12 +303,11 @@ fun MainTravelAppScreenLightPreview() {
 @Preview(name = "Main Screen - Dark Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenDarkPreview() {
-    val geminiKey = "AQ.Ab8RN6KN_pdWeE38ANxu9Os1B1JmyzoNWOwU104ckgUj9KEyOw"
-    val geoapifyKey = "2578b45979c64af6a1c192e486b9181d"
+    val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
 
-    val aiParser = AiQueryParser(geminiApiKey = geminiKey)
-    val sampleRepo = PlaceRepository(apiKey = geoapifyKey, aiParser = aiParser)
-    val sampleVM = PlaceViewModel(sampleRepo)
+    // 2. Bỏ tham số apiKey cũ
+    val sampleRepo = PlaceRepository(aiParser = aiParser)
+    val sampleVM = PlaceViewModel(repository = sampleRepo)
 
     TravelAppTheme(darkTheme = true) {
         MainTravelAppScreen(viewModel = sampleVM)

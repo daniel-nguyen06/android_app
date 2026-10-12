@@ -1,3 +1,4 @@
+import java.util.Properties
 plugins {
     id("com.android.application") version "8.3.2"
     id("org.jetbrains.kotlin.android") version "1.9.22"
@@ -8,6 +9,17 @@ android {
     compileSdk = 34
 
     defaultConfig {
+        val properties = Properties()
+        properties.load(project.rootProject.file("local.properties").inputStream())
+        val mapsApiKey = properties.getProperty("MAPS_API_KEY") ?: ""
+        val geminiApiKey = properties.getProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+
+        // Đẩy key vào BuildConfig để gọi trong file Kotlin
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
+
+        // Đẩy key vào Manifest để Google Maps SDK nhận diện
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         applicationId = "com.travel.android_app"
         minSdk = 24
         targetSdk = 34
@@ -38,6 +50,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
