@@ -41,6 +41,10 @@ class PlaceRepository(
                 location = locationParam,
                 radius = radiusParam
             )
+            println(">>> [Google Maps API] Trạng thái: ${response.status}, Số kết quả: ${response.results.size}")
+            if (response.status != "OK" && response.status != "ZERO_RESULTS") {
+                 println(">>> [Google Maps API Lỗi] Có thể API Key chưa kích hoạt Places API hoặc bị giới hạn.")
+            }
 
             // 4. Map dữ liệu Google sang PlaceItem của ứng dụng
             response.results.mapNotNull { result ->

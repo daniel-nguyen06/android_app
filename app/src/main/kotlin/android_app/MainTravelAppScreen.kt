@@ -44,11 +44,12 @@ enum class NavigationRoute {
 }
 
 /**
-- Shell chính cho ứng dụng du lịch chứa Bottom Navigation Bar.
+ * Shell chính cho ứng dụng du lịch chứa Bottom Navigation Bar.
  */
 @Composable
 fun MainTravelAppScreen(
-    viewModel: PlaceViewModel,
+    placeViewModel: PlaceViewModel,
+    tripViewModel: TripViewModel,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(TravelTab.EXPLORE) }
@@ -69,16 +70,25 @@ fun MainTravelAppScreen(
                 )
             }
             NavigationRoute.FIND_LOCATION -> {
-                android_app.ui.screens.FindLocationScreen(onBack = { currentRoute = NavigationRoute.HOME })
+                android_app.ui.screens.FindLocationScreen(
+                    viewModel = placeViewModel,
+                    onBack = { currentRoute = NavigationRoute.HOME }
+                )
             }
             NavigationRoute.CREATE_TRIP -> {
-                android_app.ui.screens.CreateTripScreen(onBack = { currentRoute = NavigationRoute.HOME })
+                android_app.ui.screens.CreateTripScreen(
+                    viewModel = tripViewModel,
+                    onBack = { currentRoute = NavigationRoute.HOME }
+                )
             }
             NavigationRoute.CREATE_ITINERARY -> {
                 android_app.ui.screens.CreateItineraryScreen(onBack = { currentRoute = NavigationRoute.HOME })
             }
             NavigationRoute.VIEW_ITINERARY -> {
-                android_app.ui.screens.ViewItineraryScreen(onBack = { currentRoute = NavigationRoute.HOME })
+                android_app.ui.screens.ViewItineraryScreen(
+                    viewModel = tripViewModel,
+                    onBack = { currentRoute = NavigationRoute.HOME }
+                )
             }
             else -> {}
         }
@@ -144,10 +154,10 @@ fun MainTravelAppScreen(
         ) {
             when (selectedTab) {
                 TravelTab.EXPLORE -> {
-                    PlaceDiscoveryRoute(viewModel = viewModel)
+                    PlaceDiscoveryRoute(viewModel = placeViewModel)
                 }
                 TravelTab.FAVORITES -> {
-                    FavoritesTabScreen(viewModel = viewModel)
+                    FavoritesTabScreen(viewModel = placeViewModel)
                 }
                 TravelTab.TRIPS -> {
                     TripsTabScreen()
@@ -289,14 +299,13 @@ fun TripsTabScreen(modifier: Modifier = Modifier) {
 @Composable
 fun MainTravelAppScreenLightPreview() {
     val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
-
-    // 2. Bỏ tham số apiKey cũ vì PlaceRepository bản Google Maps không cần nữa
+    val budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY)
     val sampleRepo = PlaceRepository(aiParser = aiParser)
-
-    val sampleVM = PlaceViewModel(repository = sampleRepo)
-
+    val tripRepo = TripRepository(budgetService = budgetService)
+    val placeVM = PlaceViewModel(sampleRepo)
+    val tripVM = TripViewModel(tripRepo)
     TravelAppTheme(darkTheme = false) {
-        MainTravelAppScreen(viewModel = sampleVM)
+        MainTravelAppScreen(placeViewModel = placeVM, tripViewModel = tripVM)
     }
 }
 
@@ -304,12 +313,12 @@ fun MainTravelAppScreenLightPreview() {
 @Composable
 fun MainTravelAppScreenDarkPreview() {
     val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
-
-    // 2. Bỏ tham số apiKey cũ
+    val budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY)
     val sampleRepo = PlaceRepository(aiParser = aiParser)
-    val sampleVM = PlaceViewModel(repository = sampleRepo)
-
+    val tripRepo = TripRepository(budgetService = budgetService)
+    val placeVM = PlaceViewModel(sampleRepo)
+    val tripVM = TripViewModel(tripRepo)
     TravelAppTheme(darkTheme = true) {
-        MainTravelAppScreen(viewModel = sampleVM)
+        MainTravelAppScreen(placeViewModel = placeVM, tripViewModel = tripVM)
     }
 }

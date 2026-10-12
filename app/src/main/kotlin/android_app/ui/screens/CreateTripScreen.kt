@@ -13,21 +13,40 @@ import androidx.compose.material.icons.filled.Title
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import coil.compose.AsyncImage
 import androidx.compose.ui.unit.dp
 
+import android_app.TripViewModel
+import kotlinx.coroutines.launch
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateTripScreen(
+    viewModel: TripViewModel,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    
     var tripName by remember { mutableStateOf("") }
+    var destination by remember { mutableStateOf("") }
     var startDate by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
+    var days by remember { mutableStateOf("") }
+    
+    // Xử lý thành công
+    LaunchedEffect(uiState.createTripSuccess) {
+        if (uiState.createTripSuccess) {
+            viewModel.resetCreateState()
+            onBack()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -42,7 +61,17 @@ fun CreateTripScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { /* TODO: Save trip */ },
+                onClick = { 
+                    if (tripName.isNotBlank() && destination.isNotBlank()) {
+                        viewModel.createTrip(
+                            title = tripName,
+                            destination = destination,
+                            startDate = startDate,
+                            endDate = endDate,
+                            days = days.toIntOrNull() ?: 1
+                        )
+                    }
+                },
                 icon = { Icon(Icons.Default.Title, contentDescription = null) },
                 text = { Text("Lưu chuyến đi") }
             )
@@ -102,10 +131,21 @@ fun CreateTripScreen(
                 value = tripName,
                 onValueChange = { tripName = it },
                 label = { Text("Tên chuyến đi") },
-                placeholder = { Text("VD: Du lịch Đà Lạt mộng mơ") },
+                placeholder = { Text("VD: Trải nghiệm thanh xuân") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Title, contentDescription = null) }
+            )
+            
+            // Destination Input
+            OutlinedTextField(
+                value = destination,
+                onValueChange = { destination = it },
+                label = { Text("Điểm đến (Thành phố/Quốc gia)") },
+                placeholder = { Text("VD: Đà Lạt, Nha Trang") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Place, contentDescription = null) }
             )
 
             // Date Selection
@@ -133,21 +173,28 @@ fun CreateTripScreen(
                     onValueChange = { endDate = it },
                     label = { Text("Ngày về") },
                     modifier = Modifier.weight(1f),
-                    readOnly = true,
                     trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) }
                 )
             }
             
-            // Note
             OutlinedTextField(
-                value = "",
-                onValueChange = { },
-                label = { Text("Ghi chú thêm (Không bắt buộc)") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                maxLines = 5
+                value = days,
+                onValueChange = { days = it },
+                label = { Text("Tổng số ngày") },
+                placeholder = { Text("VD: 3") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                trailingIcon = { Icon(Icons.Default.Timer, contentDescription = null) }
             )
+            
+            if (uiState.isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text("Đang tải & Tính toán ngân sách AI...", modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
+            
+            uiState.error?.let {
+                Text(text = "Lỗi: $it", color = MaterialTheme.colorScheme.error)
+            }
             
             Spacer(modifier = Modifier.height(64.dp)) // Spacing for FAB
         }

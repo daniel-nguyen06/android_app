@@ -41,7 +41,8 @@ class MainActivity : ComponentActivity() {
         val placeRepository = PlaceRepository(aiParser = aiParser)
 
         // 4. KHỞI TẠO VIEWMODEL
-        val viewModel = PlaceViewModel(repository = placeRepository)
+        val placeViewModel = PlaceViewModel(repository = placeRepository)
+        val tripViewModel = TripViewModel(repository = tripRepository)
 
         // 5. GẮN GIAO DIỆN
         setContent {
@@ -50,7 +51,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainTravelAppScreen(viewModel = viewModel)
+                    MainTravelAppScreen(
+                        placeViewModel = placeViewModel,
+                        tripViewModel = tripViewModel
+                    )
                 }
             }
         }

@@ -16,19 +16,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+import android_app.TripViewModel
+import android_app.TripPlan
+import android_app.TripStop
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ViewItineraryScreen(
+    viewModel: TripViewModel,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val activities = listOf(
-        "08:00" to "Ăn sáng tại khách sạn",
-        "09:30" to "Tham quan Dinh Bảo Đại",
-        "12:00" to "Ăn trưa đặc sản",
-        "14:00" to "Check-in Quảng trường Lâm Viên",
-        "18:00" to "Dạo chợ đêm"
-    )
+    val uiState by viewModel.uiState.collectAsState()
+    val trips = uiState.trips
+    
+    // For demo, we just show the first trip if it exists
+    val currentTrip = trips.firstOrNull()
 
     Scaffold(
         topBar = {
@@ -48,51 +53,78 @@ fun ViewItineraryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Header
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
+            if (currentTrip == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Chưa có chuyến đi nào. Hãy tạo chuyến đi mới!")
+                }
+            } else {
+                // Header
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "Du lịch Đà Lạt mộng mơ",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "12/10/2026 - 15/10/2026",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = currentTrip.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${currentTrip.startDate} - ${currentTrip.endDate} (${currentTrip.totalDays} ngày)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Điểm đến: ${currentTrip.destination}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        currentTrip.budget?.totalEstimated?.let {
+                            Text(
+                                text = "Ngân sách dự kiến (AI): $it",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
-            }
 
-            // Timeline
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp)
-            ) {
-                item {
-                    Text(
-                        text = "Ngày 1 - 12/10",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-                }
-                
-                items(activities.size) { index ->
-                    val isLast = index == activities.lastIndex
-                    TimelineItem(
-                        time = activities[index].first,
-                        name = activities[index].second,
-                        isLast = isLast
-                    )
+                // Timeline
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "Lịch trình đề xuất",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                    
+                    if (currentTrip.stops.isEmpty()) {
+                        item {
+                            Text("Chưa có địa điểm nào được thêm vào lịch trình này.")
+                        }
+                    } else {
+                        items(currentTrip.stops.size) { index ->
+                            val stop = currentTrip.stops[index]
+                            val isLast = index == currentTrip.stops.lastIndex
+                            TimelineItem(
+                                time = "Điểm dừng ${index + 1}",
+                                name = stop.name,
+                                isLast = isLast
+                            )
+                        }
+                    }
                 }
             }
         }

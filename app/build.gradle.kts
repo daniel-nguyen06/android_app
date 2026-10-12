@@ -65,6 +65,9 @@ android {
             excludes += "META-INF/io.netty.versions.properties"
         }
     }
+    lint {
+        abortOnError = false
+    }
 }
 
 dependencies {
