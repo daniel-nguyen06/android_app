@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException // Bắt buộc phải import thư viện này
 
 /**
  * ViewModel điều phối logic nghiệp vụ tìm kiếm, lọc, sắp xếp địa điểm và cập nhật UI State.
@@ -81,8 +82,14 @@ class PlaceViewModel(
     /**
      * Gọi API qua Repository để lấy dữ liệu danh sách địa điểm theo từ khóa & category
      */
+    /**
+     * Gọi API qua Repository để lấy dữ liệu danh sách địa điểm theo từ khóa & category
+     */
+    /**
+     * Gọi API qua Repository để lấy dữ liệu danh sách địa điểm theo từ khóa & category
+     */
     fun loadPlaces() {
-        loadDataJob?.cancel()
+        loadDataJob?.cancel() // Lệnh này sẽ ném ra CancellationException cho luồng cũ
         loadDataJob = scope.launch {
             _uiState.update { it.copy(status = PlaceScreenStatus.Loading) }
 
@@ -101,13 +108,20 @@ class PlaceViewModel(
 
                 // Áp dụng Lọc & Sắp xếp
                 applyLocalFiltersAndSort()
+
+            } catch (e: CancellationException) {
+                // ĐÂY LÀ ĐOẠN BẠN CẦN THÊM VÀO:
+                // Ném trả lại lỗi hủy luồng cho Coroutine tự dọn dẹp ngầm,
+                // không hiển thị ra UI.
+                throw e
+
             } catch (e: Exception) {
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         status = PlaceScreenStatus.Error(
                             e.localizedMessage ?: "Không thể kết nối đến máy chủ. Vui lòng thử lại!"
                         )
-                    ) 
+                    )
                 }
             }
         }

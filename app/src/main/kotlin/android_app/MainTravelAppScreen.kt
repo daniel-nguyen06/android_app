@@ -19,7 +19,7 @@ import androidx.compose.foundation.background
 import android_app.ui.theme.TravelAppTheme
 
 /**
- * Danh sách các Tab điều hướng của Ứng dụng Du lịch
+- Danh sách các Tab điều hướng của Ứng dụng Du lịch
  */
 enum class TravelTab(
     val title: String,
@@ -43,7 +43,7 @@ enum class NavigationRoute {
 }
 
 /**
- * Shell chính cho ứng dụng du lịch chứa Bottom Navigation Bar.
+- Shell chính cho ứng dụng du lịch chứa Bottom Navigation Bar.
  */
 @Composable
 fun MainTravelAppScreen(
@@ -93,7 +93,7 @@ fun MainTravelAppScreen(
             ) {
                 TravelTab.entries.forEach { tab ->
                     val isSelected = selectedTab == tab
-                    
+
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -112,7 +112,7 @@ fun MainTravelAppScreen(
                                     .background(MaterialTheme.colorScheme.error) // Red border like sample
                             )
                         }
-                        
+
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
@@ -157,7 +157,7 @@ fun MainTravelAppScreen(
                         onNavigateToCreateTrip = { currentRoute = NavigationRoute.CREATE_TRIP },
                         onNavigateToCreateItinerary = { currentRoute = NavigationRoute.CREATE_ITINERARY },
                         onNavigateToViewItinerary = { currentRoute = NavigationRoute.VIEW_ITINERARY },
-                        onLogout = { 
+                        onLogout = {
                             selectedTab = TravelTab.EXPLORE // Reset tab
                             currentRoute = NavigationRoute.LOGIN // Navigate to login
                         }
@@ -169,7 +169,7 @@ fun MainTravelAppScreen(
 }
 
 /**
- * Tab Danh sách Địa điểm Yêu thích
+- Tab Danh sách Địa điểm Yêu thích
  */
 @Composable
 fun FavoritesTabScreen(
@@ -241,7 +241,7 @@ fun FavoritesTabScreen(
 }
 
 /**
- * Tab Quản lý Chuyến đi
+- Tab Quản lý Chuyến đi
  */
 @Composable
 fun TripsTabScreen(modifier: Modifier = Modifier) {
@@ -280,17 +280,20 @@ fun TripsTabScreen(modifier: Modifier = Modifier) {
     }
 }
 
-
-
 // ---------------------------------------------------------------------------
-// PREVIEWS
+// PREVIEWS - CẬP NHẬT CHO GEOAPIFY & GEMINI PARSER
 // ---------------------------------------------------------------------------
 
 @Preview(name = "Main Screen - Light Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenLightPreview() {
-    val sampleRepo = PlaceRepository(PlacesApiService.create(), "")
+    val geminiKey = "AQ.Ab8RN6KN_pdWeE38ANxu9Os1B1JmyzoNWOwU104ckgUj9KEyOw"
+    val geoapifyKey = "2578b45979c64af6a1c192e486b9181d"
+
+    val aiParser = AiQueryParser(geminiApiKey = geminiKey)
+    val sampleRepo = PlaceRepository(apiKey = geoapifyKey, aiParser = aiParser)
     val sampleVM = PlaceViewModel(sampleRepo)
+
     TravelAppTheme(darkTheme = false) {
         MainTravelAppScreen(viewModel = sampleVM)
     }
@@ -299,8 +302,13 @@ fun MainTravelAppScreenLightPreview() {
 @Preview(name = "Main Screen - Dark Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenDarkPreview() {
-    val sampleRepo = PlaceRepository(PlacesApiService.create(), "")
+    val geminiKey = "AQ.Ab8RN6KN_pdWeE38ANxu9Os1B1JmyzoNWOwU104ckgUj9KEyOw"
+    val geoapifyKey = "2578b45979c64af6a1c192e486b9181d"
+
+    val aiParser = AiQueryParser(geminiApiKey = geminiKey)
+    val sampleRepo = PlaceRepository(apiKey = geoapifyKey, aiParser = aiParser)
     val sampleVM = PlaceViewModel(sampleRepo)
+
     TravelAppTheme(darkTheme = true) {
         MainTravelAppScreen(viewModel = sampleVM)
     }

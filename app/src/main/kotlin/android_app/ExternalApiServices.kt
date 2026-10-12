@@ -76,7 +76,9 @@ data class GeminiCandidate(
 )
 
 interface GeminiApiService {
-    @retrofit2.http.POST("v1beta/models/gemini-1.5-flash:generateContent")
+
+    // ĐỔI TỪ 1.5 SANG 2.5 Ở DÒNG NÀY:
+    @retrofit2.http.POST("v1beta/models/gemini-flash-latest:generateContent")
     suspend fun generateContent(
         @retrofit2.http.Query("key") apiKey: String,
         @retrofit2.http.Body request: GeminiRequest

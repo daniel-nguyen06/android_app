@@ -55,6 +55,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-location:21.0.1")
     // AndroidX & Jetpack Compose (Giao diện Android của bạn UI)
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
@@ -69,14 +70,17 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.google.android.gms:play-services-location:21.2.0")
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    // Thư viện lấy vị trí
+    implementation("com.google.android.gms:play-services-location:21.2.0")
+
+    // Thư viện hỗ trợ hàm .await() cho Coroutine
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     // Backend: Retrofit & Gson (Gọi Places API, Weather API,AI API)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-
-    // Backend: Firebase Admin SDK
-    implementation("com.google.firebase:firebase-admin:9.2.0")
-
+    
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
