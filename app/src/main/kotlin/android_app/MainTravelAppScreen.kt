@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,20 +14,32 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import android_app.ui.theme.TravelAppTheme
 
 /**
  * Danh sách các Tab điều hướng của Ứng dụng Du lịch
- * Dùng bộ Icons mặc định có sẵn trong compose-material core
  */
 enum class TravelTab(
     val title: String,
-    val icon: ImageVector
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector
 ) {
-    EXPLORE("Khám phá", Icons.Default.Search),
-    FAVORITES("Yêu thích", Icons.Default.Favorite),
-    TRIPS("Chuyến đi", Icons.Default.Place),
-    PROFILE("Tài khoản", Icons.Default.Person)
+    EXPLORE("Khám phá", Icons.Filled.Explore, Icons.Outlined.Explore),
+    FAVORITES("Yêu thích", Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder),
+    TRIPS("Chuyến đi", Icons.Filled.Luggage, Icons.Outlined.Luggage),
+    MENU("Menu", Icons.Filled.Menu, Icons.Outlined.Menu)
+}
+
+enum class NavigationRoute {
+    HOME,
+    LOGIN,
+    REGISTER,
+    FIND_LOCATION,
+    CREATE_TRIP,
+    CREATE_ITINERARY,
+    VIEW_ITINERARY
 }
 
 /**
@@ -38,26 +51,86 @@ fun MainTravelAppScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(TravelTab.EXPLORE) }
+    var currentRoute by remember { mutableStateOf(NavigationRoute.LOGIN) } // Start at login for demo
+
+    // If we are not on the home route (tabs), show the full screen sub-routes
+    if (currentRoute != NavigationRoute.HOME) {
+        when (currentRoute) {
+            NavigationRoute.LOGIN -> {
+                android_app.ui.screens.LoginScreen(
+                    onNavigateToHome = { currentRoute = NavigationRoute.HOME },
+                    onNavigateToRegister = { currentRoute = NavigationRoute.REGISTER }
+                )
+            }
+            NavigationRoute.REGISTER -> {
+                android_app.ui.screens.RegisterScreen(
+                    onNavigateToLogin = { currentRoute = NavigationRoute.LOGIN }
+                )
+            }
+            NavigationRoute.FIND_LOCATION -> {
+                android_app.ui.screens.FindLocationScreen(onBack = { currentRoute = NavigationRoute.HOME })
+            }
+            NavigationRoute.CREATE_TRIP -> {
+                android_app.ui.screens.CreateTripScreen(onBack = { currentRoute = NavigationRoute.HOME })
+            }
+            NavigationRoute.CREATE_ITINERARY -> {
+                android_app.ui.screens.CreateItineraryScreen(onBack = { currentRoute = NavigationRoute.HOME })
+            }
+            NavigationRoute.VIEW_ITINERARY -> {
+                android_app.ui.screens.ViewItineraryScreen(onBack = { currentRoute = NavigationRoute.HOME })
+            }
+            else -> {}
+        }
+        return // Return early to not show Scaffold with BottomNav
+    }
 
     Scaffold(
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 8.dp
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                modifier = Modifier.height(72.dp)
             ) {
                 TravelTab.entries.forEach { tab ->
                     val isSelected = selectedTab == tab
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = { selectedTab = tab },
-                        label = { Text(tab.title) },
-                        icon = {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.title
+                    
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable { selectedTab = tab },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Top Border for Active Tab
+                        if (isSelected) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .fillMaxWidth()
+                                    .height(3.dp)
+                                    .padding(horizontal = 16.dp)
+                                    .background(MaterialTheme.colorScheme.error) // Red border like sample
                             )
                         }
-                    )
+                        
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                contentDescription = tab.title,
+                                tint = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = tab.title,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -70,11 +143,7 @@ fun MainTravelAppScreen(
         ) {
             when (selectedTab) {
                 TravelTab.EXPLORE -> {
-                    val uiState by viewModel.uiState.collectAsState()
-                    PlaceDiscoveryScreen(
-                        uiState = uiState,
-                        onEvent = { event -> viewModel.onEvent(event) }
-                    )
+                    PlaceDiscoveryRoute(viewModel = viewModel)
                 }
                 TravelTab.FAVORITES -> {
                     FavoritesTabScreen(viewModel = viewModel)
@@ -82,8 +151,17 @@ fun MainTravelAppScreen(
                 TravelTab.TRIPS -> {
                     TripsTabScreen()
                 }
-                TravelTab.PROFILE -> {
-                    ProfileTabScreen()
+                TravelTab.MENU -> {
+                    android_app.ui.screens.MenuScreen(
+                        onNavigateToFindLocation = { currentRoute = NavigationRoute.FIND_LOCATION },
+                        onNavigateToCreateTrip = { currentRoute = NavigationRoute.CREATE_TRIP },
+                        onNavigateToCreateItinerary = { currentRoute = NavigationRoute.CREATE_ITINERARY },
+                        onNavigateToViewItinerary = { currentRoute = NavigationRoute.VIEW_ITINERARY },
+                        onLogout = { 
+                            selectedTab = TravelTab.EXPLORE // Reset tab
+                            currentRoute = NavigationRoute.LOGIN // Navigate to login
+                        }
+                    )
                 }
             }
         }
@@ -119,7 +197,7 @@ fun FavoritesTabScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        imageVector = Icons.Default.FavoriteBorder,
+                        imageVector = Icons.Outlined.FavoriteBorder,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.outline
@@ -175,7 +253,7 @@ fun TripsTabScreen(modifier: Modifier = Modifier) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
-                imageVector = Icons.Default.Place,
+                imageVector = Icons.Default.Luggage,
                 contentDescription = null,
                 modifier = Modifier.size(72.dp),
                 tint = MaterialTheme.colorScheme.primary
@@ -202,56 +280,7 @@ fun TripsTabScreen(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Tab Tài Khoản
- */
-@Composable
-fun ProfileTabScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(modifier = Modifier.height(32.dp))
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(96.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Người Dùng Du Lịch",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "user@travel.com",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "Cài đặt ứng dụng", fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Ngôn ngữ: Tiếng Việt", style = MaterialTheme.typography.bodySmall)
-                Text(text = "Đơn vị tiền tệ: VND (₫)", style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // PREVIEWS
@@ -260,7 +289,7 @@ fun ProfileTabScreen(modifier: Modifier = Modifier) {
 @Preview(name = "Main Screen - Light Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenLightPreview() {
-    val sampleRepo = PlaceRepository(PlacesApiService.create())
+    val sampleRepo = PlaceRepository(PlacesApiService.create(), "")
     val sampleVM = PlaceViewModel(sampleRepo)
     TravelAppTheme(darkTheme = false) {
         MainTravelAppScreen(viewModel = sampleVM)
@@ -270,7 +299,7 @@ fun MainTravelAppScreenLightPreview() {
 @Preview(name = "Main Screen - Dark Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenDarkPreview() {
-    val sampleRepo = PlaceRepository(PlacesApiService.create())
+    val sampleRepo = PlaceRepository(PlacesApiService.create(), "")
     val sampleVM = PlaceViewModel(sampleRepo)
     TravelAppTheme(darkTheme = true) {
         MainTravelAppScreen(viewModel = sampleVM)
