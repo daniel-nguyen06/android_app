@@ -25,3 +25,5 @@ local.properties
 # Artifacts & scratch files
 .artifacts/
 >>>>>>> 734c911 (feat: Implement Travel App UI with Jetpack Compose & Material 3)
+
+Firebase/serviceAccountKey.json
