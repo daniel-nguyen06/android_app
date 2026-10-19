@@ -1,5 +1,6 @@
 package android_app
 
+<<<<<<< HEAD
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.io.OutputStream
@@ -40,4 +41,13 @@ private fun sendResponse(exchange: HttpExchange, responseText: String) {
     val os: OutputStream = exchange.responseBody
     os.write(bytes)
     os.close()
+=======
+import android.app.Application
+
+
+class TravelApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+    }
+>>>>>>> origin/fix/database
 }

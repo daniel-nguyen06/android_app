@@ -1,5 +1,35 @@
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> origin/fix/database
 # Ignore Gradle project-specific cache directory
 .gradle
 
 # Ignore Gradle build output directory
 build
+<<<<<<< HEAD
+=======
+
+firebase/serviceAccountKey.json
+=======
+# Gradle & Build output
+.gradle/
+build/
+app/build/
+*.apk
+*.aar
+*.hprof
+
+# IDE & OS settings
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Android SDK & local properties
+local.properties
+
+# Artifacts & scratch files
+.artifacts/
+>>>>>>> 734c911 (feat: Implement Travel App UI with Jetpack Compose & Material 3)
+>>>>>>> origin/fix/database

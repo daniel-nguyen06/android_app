@@ -1,5 +1,6 @@
 package android_app
 
+<<<<<<< HEAD
 import com.google.gson.annotations.SerializedName
 
 // Cấu trúc trả về tổng quát từ Google Places TextSearch / NearbySearch
@@ -28,4 +29,16 @@ data class Geometry(
 data class LocationLatLng(
     @SerializedName("lat") val lat: Double,
     @SerializedName("lng") val lng: Double
+=======
+/**
+ * Model ánh xạ cho UI hiển thị danh sách địa điểm khám phá.
+ */
+data class PlaceUiModel(
+    val id: String,
+    val name: String,
+    val rating: Double,
+    val vicinity: String?,
+    val distanceKm: Double,
+    val priceLevel: Int
+>>>>>>> origin/fix/database
 )
