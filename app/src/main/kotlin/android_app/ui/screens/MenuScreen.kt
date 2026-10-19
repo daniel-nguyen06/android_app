@@ -11,6 +11,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.filled.*
+import android_app.ui.theme.SunsetCoral
+import android_app.ui.theme.MangoGold
+import android_app.ui.theme.LagoonTeal
+import android_app.ui.theme.SunsetCoral
+import android_app.ui.theme.MangoGold
+import android_app.ui.theme.LagoonTeal
+import android_app.ui.theme.DeepSea
+import android_app.ui.theme.SunsetCoralDark
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.*
@@ -103,7 +111,7 @@ fun MenuScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "NGUYEN TRONG TUAN",
+                            text = "Nguyen Trong Tuan", // Title case formatting
                             color = Color.White,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
@@ -153,7 +161,7 @@ fun MenuScreen(
                 icon = Icons.Outlined.Place,
                 title = "Tìm địa điểm",
                 onClick = onNavigateToFindLocation,
-                iconTint = Color(0xFFE91E63) // Pink
+                iconTint = SunsetCoral // Golden Hour theme
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
             
@@ -161,23 +169,23 @@ fun MenuScreen(
                 icon = Icons.Default.Luggage,
                 title = "Tạo chuyến đi",
                 onClick = onNavigateToCreateTrip,
-                iconTint = Color(0xFF4CAF50) // Green
+                iconTint = MangoGold // Golden Hour theme
             )
-            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
             
             MenuItem(
                 icon = Icons.Default.EditCalendar,
                 title = "Tạo lịch trình",
                 onClick = onNavigateToCreateItinerary,
-                iconTint = Color(0xFFFF9800) // Orange
+                iconTint = LagoonTeal // Golden Hour theme
             )
-            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
             
             MenuItem(
                 icon = Icons.Default.ViewTimeline,
                 title = "Xem lịch trình",
                 onClick = onNavigateToViewItinerary,
-                iconTint = Color(0xFF2196F3) // Blue
+                iconTint = DeepSea // Golden Hour theme
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.surfaceVariant)
 
@@ -192,60 +200,62 @@ fun MenuScreen(
                 icon = Icons.AutoMirrored.Filled.Logout,
                 title = "Đăng xuất",
                 onClick = onLogout,
-                iconTint = MaterialTheme.colorScheme.error,
-                textColor = MaterialTheme.colorScheme.error
+                iconTint = SunsetCoralDark,
+                textColor = SunsetCoralDark
             )
         }
         
         Spacer(modifier = Modifier.weight(1f))
 
         // 3. Bottom Card (Khám phá bản đồ)
-        OutlinedCard(
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            colors = CardDefaults.outlinedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
         ) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(Brush.horizontalGradient(listOf(LagoonTeal, DeepSea)))
                     .clickable { /* TODO */ }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(16.dp)
             ) {
-                // Map Icon Circle
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Map,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary
+                    // Map Icon Circle
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White.copy(alpha = 0.2f),
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Map,
+                                contentDescription = null,
+                                tint = Color.White
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    Column {
+                        Text(
+                            text = "Khám phá bản đồ",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tìm kiếm các điểm đến hấp dẫn quanh bạn",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.8f)
                         )
                     }
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                Column {
-                    Text(
-                        text = "Khám phá bản đồ",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Tìm kiếm các điểm đến hấp dẫn quanh bạn",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
         }

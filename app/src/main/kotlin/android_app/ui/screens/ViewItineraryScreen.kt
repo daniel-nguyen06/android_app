@@ -21,6 +21,8 @@ import android_app.TripPlan
 import android_app.TripStop
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import android_app.ui.theme.LagoonTeal
+import android_app.ui.theme.Lavender
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,8 +139,8 @@ fun TimelineItem(
     name: String,
     isLast: Boolean
 ) {
-    val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-    val circleColor = MaterialTheme.colorScheme.primary
+    val lineColor = Lavender
+    val circleColor = LagoonTeal
     
     Row(
         modifier = Modifier
@@ -181,7 +183,7 @@ fun TimelineItem(
             Text(
                 text = time,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                color = LagoonTeal,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
