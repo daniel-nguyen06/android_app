@@ -18,13 +18,21 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
 
+import android_app.PlaceViewModel
+import android_app.PlaceUiEvent
+import android_app.PlaceScreenStatus
+import android_app.PlaceItem
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FindLocationScreen(
+    viewModel: PlaceViewModel,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var searchQuery by remember { mutableStateOf("") }
+    val uiState by viewModel.uiState.collectAsState()
+    
+    var searchQuery by remember { mutableStateOf(uiState.searchQuery) }
     var active by remember { mutableStateOf(false) }
     
     val categories = listOf("Nhà hàng", "Khách sạn", "Cảnh đẹp", "Quán cà phê", "Bảo tàng")
@@ -51,7 +59,10 @@ fun FindLocationScreen(
             SearchBar(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
-                onSearch = { active = false },
+                onSearch = { 
+                    active = false
+                    viewModel.onEvent(PlaceUiEvent.OnSearchQueryChanged(searchQuery))
+                },
                 active = active,
                 onActiveChange = { active = it },
                 modifier = Modifier
@@ -97,7 +108,7 @@ fun FindLocationScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Result List (Mockup)
+            // Result List
             Text(
                 text = "Gợi ý cho bạn",
                 style = MaterialTheme.typography.titleMedium,
@@ -105,12 +116,33 @@ fun FindLocationScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
             
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(5) { index ->
-                    LocationResultCard(index)
+            when (val status = uiState.status) {
+                is PlaceScreenStatus.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                is PlaceScreenStatus.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = status.message, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                is PlaceScreenStatus.Empty -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = "Không tìm thấy địa điểm nào phù hợp.")
+                    }
+                }
+                is PlaceScreenStatus.Success -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(status.places) { place ->
+                            LocationResultCard(place = place, onClick = {
+                                viewModel.onEvent(PlaceUiEvent.OnPlaceSelected(place))
+                            })
+                        }
+                    }
                 }
             }
         }
@@ -118,16 +150,16 @@ fun FindLocationScreen(
 }
 
 @Composable
-fun LocationResultCard(index: Int) {
+fun LocationResultCard(place: PlaceItem, onClick: () -> Unit) {
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(120.dp),
-        onClick = { /* TODO */ }
+        onClick = onClick
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = "https://images.unsplash.com/photo-1542259009477-d625272157b7?q=80&w=300&auto=format&fit=crop",
+                model = place.imageUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -143,7 +175,7 @@ fun LocationResultCard(index: Int) {
             ) {
                 Column {
                     Text(
-                        text = "Địa điểm nổi bật $index",
+                        text = place.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
@@ -158,16 +190,17 @@ fun LocationResultCard(index: Int) {
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "4.${5 + index} (12$index đánh giá)",
+                            text = "${place.rating} (${(10..500).random()} đánh giá)",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
                 
                 Text(
-                    text = "Cách đây ${index * 2} km",
+                    text = if (place.distanceInKm > 0) "Cách đây ${place.distanceInKm} km" else place.vicinity ?: "",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
             }
         }

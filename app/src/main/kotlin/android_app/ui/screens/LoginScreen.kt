@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -25,8 +26,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-
-import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,68 +38,27 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    val auth = remember { FirebaseAuth.getInstance() }
-
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var successMessage by remember { mutableStateOf<String?>(null) }
-
-    fun loginUser() {
-        val userEmail = email.trim()
-
-        errorMessage = null
-        successMessage = null
-
-        if (userEmail.isBlank() || password.isBlank()) {
-            errorMessage = "Vui lòng nhập email và mật khẩu."
-            return
-        }
-
-        isLoading = true
-
-        auth.signInWithEmailAndPassword(userEmail, password)
-            .addOnCompleteListener { task ->
-                isLoading = false
-
-                if (task.isSuccessful) {
-                    onNavigateToHome()
-                } else {
-                    errorMessage = when (
-                        (task.exception as? com.google.firebase.auth.FirebaseAuthException)?.errorCode
-                    ) {
-                        "ERROR_INVALID_EMAIL" ->
-                            "Địa chỉ email không hợp lệ."
-
-                        "ERROR_USER_NOT_FOUND",
-                        "ERROR_WRONG_PASSWORD",
-                        "ERROR_INVALID_CREDENTIAL" ->
-                            "Email hoặc mật khẩu không chính xác."
-
-                        "ERROR_USER_DISABLED" ->
-                            "Tài khoản đã bị vô hiệu hóa."
-
-                        else ->
-                            task.exception?.localizedMessage
-                                ?: "Đăng nhập thất bại. Vui lòng thử lại."
-                    }
-                }
-            }
-    }
-
     Box(modifier = modifier.fillMaxSize()) {
-        // Background Image (Sky Theme)
+        // Background Image (Aerial Tropical Beach)
         AsyncImage(
-            model = "https://images.unsplash.com/photo-1509803874385-db7c23652552?q=80&w=1000&auto=format&fit=crop", // Cloudy blue sky
+            model = "https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=1000&auto=format&fit=crop", // Tropical aerial beach matching user prompt
             contentDescription = "Background",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
 
-        // Dark Overlay for readability
+        // Warm Gradient Overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFFF6B4A).copy(alpha = 0.35f), // Sunset Coral
+                            Color(0xFFFFC24B).copy(alpha = 0.35f)  // Mango Gold
+                        )
+                    )
+                )
         )
 
         Column(
@@ -133,7 +91,7 @@ fun LoginScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
                     .clip(RoundedCornerShape(24.dp)),
-                color = Color.White.copy(alpha = 0.15f), // Semi-transparent white
+                color = Color.White.copy(alpha = 0.2f), // Increased to 0.2 for readability
             ) {
                 Column(
                     modifier = Modifier
@@ -152,18 +110,18 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
-                        label = { Text("Email", color = Color.White.copy(alpha = 0.7f)) },
+                        label = { Text("Email", color = Color.White) },
                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = Color.White) },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.White,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
+                            focusedBorderColor = MaterialTheme.colorScheme.primary, // Sunset Coral
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.6f),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            cursorColor = Color.White
+                            cursorColor = MaterialTheme.colorScheme.primary
                         )
                     )
 
@@ -172,7 +130,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Mật khẩu", color = Color.White.copy(alpha = 0.7f)) },
+                        label = { Text("Mật khẩu", color = Color.White) },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White) },
                         trailingIcon = {
                             val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
@@ -186,11 +144,11 @@ fun LoginScreen(
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.White,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
+                            focusedBorderColor = MaterialTheme.colorScheme.primary, // Sunset Coral
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.6f),
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            cursorColor = Color.White
+                            cursorColor = MaterialTheme.colorScheme.primary
                         )
                     )
 
@@ -198,29 +156,7 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        TextButton(
-                            onClick = {
-                                val userEmail = email.trim()
-
-                                if (userEmail.isBlank()) {
-                                    errorMessage = "Nhập email để nhận liên kết đặt lại mật khẩu."
-                                    successMessage = null
-                                } else {
-                                    errorMessage = null
-                                    successMessage = null
-
-                                    auth.sendPasswordResetEmail(userEmail)
-                                        .addOnSuccessListener {
-                                            successMessage =
-                                                "Nếu email hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi."
-                                        }
-                                        .addOnFailureListener {
-                                            errorMessage =
-                                                "Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại."
-                                        }
-                                }
-                            }
-                        ) {
+                        TextButton(onClick = { /* TODO: Forgot Password */ }) {
                             Text(
                                 text = "Quên mật khẩu?",
                                 color = Color.White,
@@ -231,47 +167,18 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    errorMessage?.let { message ->
-                        Text(
-                            text = message,
-                            color = Color(0xFFFF8A80),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    successMessage?.let { message ->
-                        Text(
-                            text = message,
-                            color = Color(0xFFB9F6CA),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
                     Button(
-                        onClick = { loginUser() },
-                        enabled = !isLoading,
+                        onClick = onNavigateToHome,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
                         shape = RoundedCornerShape(percent = 50), // Pill shape
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF1E1E1E), // Dark button
+                            containerColor = MaterialTheme.colorScheme.primary, // Sunset Coral
                             contentColor = Color.White
                         )
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Text(
-                                "ĐĂNG NHẬP",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Text("ĐĂNG NHẬP", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

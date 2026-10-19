@@ -12,15 +12,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import android_app.ui.theme.TravelAppTheme
 import com.travel.android_app.BuildConfig
-
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 
 /**
 - Danh sách các Tab điều hướng của Ứng dụng Du lịch
@@ -47,62 +45,23 @@ enum class NavigationRoute {
 }
 
 /**
-- Shell chính cho ứng dụng du lịch chứa Bottom Navigation Bar.
+ * Shell chính cho ứng dụng du lịch chứa Bottom Navigation Bar.
  */
 @Composable
 fun MainTravelAppScreen(
-    viewModel: PlaceViewModel,
+    placeViewModel: PlaceViewModel,
+    tripViewModel: TripViewModel,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(TravelTab.EXPLORE) }
     var currentRoute by remember { mutableStateOf(NavigationRoute.LOGIN) } // Start at login for demo
-
-    var fullName by remember { mutableStateOf<String?>(null) }
-    var isLoadingProfile by remember { mutableStateOf(false) }
-    var profileError by remember { mutableStateOf<String?>(null) }
-
-    val auth = remember { FirebaseAuth.getInstance() }
-    val firestore = remember { FirebaseFirestore.getInstance() }
-
-    fun loadUserProfile() {
-        val uid = auth.currentUser?.uid
-
-        if (uid == null) {
-            currentRoute = NavigationRoute.LOGIN
-            return
-        }
-
-        isLoadingProfile = true
-        profileError = null
-
-        firestore.collection("users")
-            .document(uid)
-            .get()
-            .addOnSuccessListener { document ->
-                val name = document.getString("fullName")
-
-                if (!name.isNullOrBlank()) {
-                    fullName = name
-                    isLoadingProfile = false
-                    currentRoute = NavigationRoute.HOME
-                } else {
-                    isLoadingProfile = false
-                    profileError = "Không tìm thấy fullName trong hồ sơ người dùng."
-                }
-            }
-            .addOnFailureListener { exception ->
-                isLoadingProfile = false
-                profileError = exception.localizedMessage
-                    ?: "Không tải được hồ sơ người dùng."
-            }
-    }
 
     // If we are not on the home route (tabs), show the full screen sub-routes
     if (currentRoute != NavigationRoute.HOME) {
         when (currentRoute) {
             NavigationRoute.LOGIN -> {
                 android_app.ui.screens.LoginScreen(
-                    onNavigateToHome = { loadUserProfile() },
+                    onNavigateToHome = { currentRoute = NavigationRoute.HOME },
                     onNavigateToRegister = { currentRoute = NavigationRoute.REGISTER }
                 )
             }
@@ -112,16 +71,25 @@ fun MainTravelAppScreen(
                 )
             }
             NavigationRoute.FIND_LOCATION -> {
-                android_app.ui.screens.FindLocationScreen(onBack = { currentRoute = NavigationRoute.HOME })
+                android_app.ui.screens.FindLocationScreen(
+                    viewModel = placeViewModel,
+                    onBack = { currentRoute = NavigationRoute.HOME }
+                )
             }
             NavigationRoute.CREATE_TRIP -> {
-                android_app.ui.screens.CreateTripScreen(onBack = { currentRoute = NavigationRoute.HOME })
+                android_app.ui.screens.CreateTripScreen(
+                    viewModel = tripViewModel,
+                    onBack = { currentRoute = NavigationRoute.HOME }
+                )
             }
             NavigationRoute.CREATE_ITINERARY -> {
                 android_app.ui.screens.CreateItineraryScreen(onBack = { currentRoute = NavigationRoute.HOME })
             }
             NavigationRoute.VIEW_ITINERARY -> {
-                android_app.ui.screens.ViewItineraryScreen(onBack = { currentRoute = NavigationRoute.HOME })
+                android_app.ui.screens.ViewItineraryScreen(
+                    viewModel = tripViewModel,
+                    onBack = { currentRoute = NavigationRoute.HOME }
+                )
             }
             else -> {}
         }
@@ -153,7 +121,7 @@ fun MainTravelAppScreen(
                                     .fillMaxWidth()
                                     .height(3.dp)
                                     .padding(horizontal = 16.dp)
-                                    .background(MaterialTheme.colorScheme.error) // Red border like sample
+                                    .background(MaterialTheme.colorScheme.primary) // Sunset Coral border
                             )
                         }
 
@@ -164,14 +132,15 @@ fun MainTravelAppScreen(
                             Icon(
                                 imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
                                 contentDescription = tab.title,
-                                tint = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                modifier = Modifier.size(24.dp)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = tab.title,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                             )
                         }
                     }
@@ -187,26 +156,23 @@ fun MainTravelAppScreen(
         ) {
             when (selectedTab) {
                 TravelTab.EXPLORE -> {
-                    PlaceDiscoveryRoute(viewModel = viewModel)
+                    PlaceDiscoveryRoute(viewModel = placeViewModel)
                 }
                 TravelTab.FAVORITES -> {
-                    FavoritesTabScreen(viewModel = viewModel)
+                    FavoritesTabScreen(viewModel = placeViewModel)
                 }
                 TravelTab.TRIPS -> {
                     TripsTabScreen()
                 }
                 TravelTab.MENU -> {
                     android_app.ui.screens.MenuScreen(
-                        fullName = fullName.orEmpty(),
                         onNavigateToFindLocation = { currentRoute = NavigationRoute.FIND_LOCATION },
                         onNavigateToCreateTrip = { currentRoute = NavigationRoute.CREATE_TRIP },
                         onNavigateToCreateItinerary = { currentRoute = NavigationRoute.CREATE_ITINERARY },
                         onNavigateToViewItinerary = { currentRoute = NavigationRoute.VIEW_ITINERARY },
                         onLogout = {
-                            fullName = null
-                            profileError = null
-                            selectedTab = TravelTab.EXPLORE
-                            currentRoute = NavigationRoute.LOGIN
+                            selectedTab = TravelTab.EXPLORE // Reset tab
+                            currentRoute = NavigationRoute.LOGIN // Navigate to login
                         }
                     )
                 }
@@ -335,14 +301,13 @@ fun TripsTabScreen(modifier: Modifier = Modifier) {
 @Composable
 fun MainTravelAppScreenLightPreview() {
     val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
-
-    // 2. Bỏ tham số apiKey cũ vì PlaceRepository bản Google Maps không cần nữa
+    val budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY)
     val sampleRepo = PlaceRepository(aiParser = aiParser)
-
-    val sampleVM = PlaceViewModel(repository = sampleRepo)
-
+    val tripRepo = TripRepository(budgetService = budgetService)
+    val placeVM = PlaceViewModel(sampleRepo)
+    val tripVM = TripViewModel(tripRepo)
     TravelAppTheme(darkTheme = false) {
-        MainTravelAppScreen(viewModel = sampleVM)
+        MainTravelAppScreen(placeViewModel = placeVM, tripViewModel = tripVM)
     }
 }
 
@@ -350,12 +315,12 @@ fun MainTravelAppScreenLightPreview() {
 @Composable
 fun MainTravelAppScreenDarkPreview() {
     val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
-
-    // 2. Bỏ tham số apiKey cũ
+    val budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY)
     val sampleRepo = PlaceRepository(aiParser = aiParser)
-    val sampleVM = PlaceViewModel(repository = sampleRepo)
-
+    val tripRepo = TripRepository(budgetService = budgetService)
+    val placeVM = PlaceViewModel(sampleRepo)
+    val tripVM = TripViewModel(tripRepo)
     TravelAppTheme(darkTheme = true) {
-        MainTravelAppScreen(viewModel = sampleVM)
+        MainTravelAppScreen(placeViewModel = placeVM, tripViewModel = tripVM)
     }
 }

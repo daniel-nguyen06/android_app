@@ -9,12 +9,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.background
+import android_app.ui.theme.SunsetCoral
 import android_app.ui.theme.TravelAppTheme
 
 /**
@@ -67,6 +72,19 @@ fun PlaceDiscoveryScreen(
                 )
             )
         },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { /* TODO: Check-in action */ },
+                containerColor = SunsetCoral,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(percent = 50),
+                modifier = Modifier.shadow(8.dp, spotColor = SunsetCoral, ambientColor = SunsetCoral, shape = RoundedCornerShape(percent = 50))
+            ) {
+                Icon(Icons.Default.Place, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Check-in", fontWeight = FontWeight.Bold)
+            }
+        },
         modifier = modifier
     ) { innerPadding ->
         Column(
@@ -74,7 +92,57 @@ fun PlaceDiscoveryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 1. Ô Nhập Từ Khóa Tìm Kiếm (Search Field)
+            // 1. Thẻ Hero (Lời chào & Golden Hour)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color(0xFFFF6B4A), // Sunset Coral
+                                    Color(0xFFFFC24B), // Mango Gold
+                                    Color(0xFF14B8A6)  // Lagoon Teal
+                                )
+                            )
+                        )
+                        .padding(24.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = "Khám phá thế giới",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Săn lùng khoảnh khắc Golden Hour",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Giờ vàng hôm nay: 17:15 - 18:30",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            modifier = Modifier
+                                .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            // 2. Ô Nhập Từ Khóa Tìm Kiếm (Search Field)
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { onEvent(PlaceUiEvent.OnSearchQueryChanged(it)) },
@@ -156,24 +224,37 @@ fun PlaceDiscoveryScreen(
                     is PlaceScreenStatus.Success -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 88.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             items(
-                                items = status.places,
-                                key = { it.placeId }
-                            ) { place ->
-                                val isFav = uiState.favoritePlaceIds.contains(place.placeId)
-                                PlaceCard(
-                                    place = place,
-                                    isFavorite = isFav,
-                                    onToggleFavorite = {
-                                        onEvent(PlaceUiEvent.OnToggleFavorite(place.placeId))
-                                    },
-                                    onClick = {
-                                        onEvent(PlaceUiEvent.OnPlaceSelected(place))
+                                items = status.places.chunked(2),
+                                key = { chunk -> chunk.first().placeId }
+                            ) { rowPlaces ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    for (place in rowPlaces) {
+                                        val isFav = uiState.favoritePlaceIds.contains(place.placeId)
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            PlaceCard(
+                                                place = place,
+                                                isFavorite = isFav,
+                                                onToggleFavorite = {
+                                                    onEvent(PlaceUiEvent.OnToggleFavorite(place.placeId))
+                                                },
+                                                onClick = {
+                                                    onEvent(PlaceUiEvent.OnPlaceSelected(place))
+                                                }
+                                            )
+                                        }
                                     }
-                                )
+                                    // Empty box if chunk size is 1 to maintain grid structure
+                                    if (rowPlaces.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
                             }
                         }
                     }

@@ -1,31 +1,5 @@
 package android_app
 
-<<<<<<< HEAD
-import kotlin.math.*
-
-class PlaceRepository(private val apiService: PlacesApiService, private val apiKey: String) {
-
-    // 1. Hàm gọi API lấy danh sách gốc theo từ khóa & danh mục
-    fun fetchPlaces(keyword: String, categoryType: String?): List<PlaceItem> {
-        val call = apiService.searchPlaces(query = keyword, type = categoryType, apiKey = apiKey)
-        val response = call.execute() // Thực thi gọi mạng đồng bộ để test
-        return response.body()?.results ?: emptyList()
-    }
-
-    // 2. Logic Lọc (Filter) theo Đánh giá (Rating) & Mức giá (Cost/PriceLevel)
-    fun filterPlaces(
-        list: List<PlaceItem>,
-        minRating: Double = 0.0,
-        maxPriceLevel: Int = 4
-    ): List<PlaceItem> {
-        return list.filter { place ->
-            place.rating >= minRating && place.priceLevel <= maxPriceLevel
-        }
-    }
-
-    // 3. Logic Tính khoảng cách (Distance) từ vị trí người dùng đến địa điểm (công thức Haversine)
-    fun calculateDistances(list: List<PlaceItem>, userLat: Double, userLng: Double) {
-=======
 import com.travel.android_app.BuildConfig
 import kotlin.math.*
 
@@ -67,6 +41,10 @@ class PlaceRepository(
                 location = locationParam,
                 radius = radiusParam
             )
+            println(">>> [Google Maps API] Trạng thái: ${response.status}, Số kết quả: ${response.results.size}")
+            if (response.status != "OK" && response.status != "ZERO_RESULTS") {
+                 println(">>> [Google Maps API Lỗi] Có thể API Key chưa kích hoạt Places API hoặc bị giới hạn.")
+            }
 
             // 4. Map dữ liệu Google sang PlaceItem của ứng dụng
             response.results.mapNotNull { result ->
@@ -127,7 +105,6 @@ class PlaceRepository(
 
     fun calculateDistances(list: List<PlaceItem>, userLat: Double?, userLng: Double?) {
         if (userLat == null || userLng == null) return
->>>>>>> origin/fix/database
         for (item in list) {
             val loc = item.geometry?.location
             if (loc != null) {
@@ -136,14 +113,9 @@ class PlaceRepository(
         }
     }
 
-<<<<<<< HEAD
-    // 4. Logic Sắp xếp (Sort): theo khoảng cách, đánh giá hoặc giá tiền
-    enum class SortType { DISTANCE, RATING_DESC, PRICE_ASC }
-=======
     fun filterPlaces(list: List<PlaceItem>, minRating: Double = 0.0, maxPriceLevel: Int = 4): List<PlaceItem> {
         return list.filter { it.rating >= minRating && it.priceLevel <= maxPriceLevel }
     }
->>>>>>> origin/fix/database
 
     fun sortPlaces(list: List<PlaceItem>, sortBy: SortType): List<PlaceItem> {
         return when (sortBy) {
@@ -154,20 +126,12 @@ class PlaceRepository(
     }
 
     private fun calculateHaversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-<<<<<<< HEAD
-        val r = 6371.0 // Bán kính Trái Đất (km)
-=======
         val r = 6371.0
->>>>>>> origin/fix/database
         val dLat = Math.toRadians(lat2 - lat1)
         val dLon = Math.toRadians(lon2 - lon1)
         val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-<<<<<<< HEAD
-        return Math.round(r * c * 100.0) / 100.0 // Làm tròn 2 chữ số thập phân
-=======
 
         return Math.round(r * c * 100.0) / 100.0
->>>>>>> origin/fix/database
     }
 }
