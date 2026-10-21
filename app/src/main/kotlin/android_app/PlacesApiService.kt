@@ -5,88 +5,75 @@ import com.travel.android_app.BuildConfig
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.Body
-import retrofit2.http.Header
-import retrofit2.http.POST
+import retrofit2.http.GET
+import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
-// ---------- Request ----------
-data class TextSearchRequest(
-    val textQuery: String,
-    val languageCode: String? = null,
-    val includedType: String? = null,
-    val locationBias: LocationBias? = null
+// ---------------- Geoapify ----------------
+data class GeoapifyResponse(
+    @SerializedName("features") val features: List<GeoapifyFeature>? = emptyList()
 )
 
-data class LocationBias(val circle: Circle)
-data class Circle(val center: LatLngLiteral, val radius: Double)
-data class LatLngLiteral(val latitude: Double, val longitude: Double)
-
-// ---------- Response (Places API New) ----------
-data class TextSearchResponse(
-    val places: List<NewPlace>? = emptyList()
+data class GeoapifyFeature(
+    @SerializedName("properties") val properties: GeoapifyProperties? = null,
+    /** [lonMin, latMin, lonMax, latMax] – có ở kết quả geocoding */
+    @SerializedName("bbox") val bbox: List<Double>? = null
 )
 
-data class NewPlace(
-    val id: String? = null,
-    val displayName: LocalizedText? = null,
-    val formattedAddress: String? = null,
-    val rating: Double? = null,
-    val userRatingCount: Int? = null,
-    /** Dạng chuỗi: PRICE_LEVEL_INEXPENSIVE, PRICE_LEVEL_MODERATE... */
-    val priceLevel: String? = null,
-    val location: LatLngLiteral? = null,
-    val types: List<String>? = null,
-    val currentOpeningHours: NewOpeningHours? = null,
-    val regularOpeningHours: NewOpeningHours? = null,
-    val photos: List<NewPhoto>? = null
+data class GeoapifyProperties(
+    @SerializedName("place_id") val placeId: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("city") val city: String? = null,
+    @SerializedName("state") val state: String? = null,
+    @SerializedName("country") val country: String? = null,
+    @SerializedName("result_type") val resultType: String? = null,
+    @SerializedName("formatted") val formatted: String? = null,
+    @SerializedName("address_line1") val addressLine1: String? = null,
+    @SerializedName("address_line2") val addressLine2: String? = null,
+    @SerializedName("categories") val categories: List<String>? = emptyList(),
+    @SerializedName("opening_hours") val openingHours: String? = null,
+    @SerializedName("website") val website: String? = null,
+    @SerializedName("datasource") val datasource: GeoapifyDatasource? = null,
+    @SerializedName("lat") val lat: Double? = null,
+    @SerializedName("lon") val lon: Double? = null
 )
 
-data class LocalizedText(
-    val text: String? = null,
-    @SerializedName("languageCode") val languageCode: String? = null
-)
-
-data class NewOpeningHours(
-    val openNow: Boolean? = null,
-    val weekdayDescriptions: List<String>? = null
-)
-
-data class NewPhoto(
-    /** Dạng "places/{placeId}/photos/{photoRef}" */
-    val name: String? = null,
-    val widthPx: Int? = null,
-    val heightPx: Int? = null
+data class GeoapifyDatasource(
+    @SerializedName("raw") val raw: Map<String, Any?>? = null
 )
 
 interface PlacesApiService {
 
-    @POST("v1/places:searchText")
-    suspend fun searchText(
-        @Body body: TextSearchRequest,
-        @Header("X-Goog-FieldMask") fieldMask: String = DEFAULT_FIELD_MASK
-    ): TextSearchResponse
+    @GET("v2/places")
+    suspend fun searchPlaces(
+        @Query("categories") categories: String,
+        @Query("filter") filter: String? = null,
+        @Query("bias") bias: String? = null,
+        @Query("name") name: String? = null,
+        @Query("lang") lang: String? = null,
+        @Query("limit") limit: Int = 30
+    ): GeoapifyResponse
+
+    @GET("v1/geocode/search")
+    suspend fun geocode(
+        @Query("text") text: String,
+        @Query("lang") lang: String? = null,
+        @Query("limit") limit: Int = 1
+    ): GeoapifyResponse
 
     companion object {
-        private const val BASE_URL = "https://places.googleapis.com/"
-
-        const val DEFAULT_FIELD_MASK =
-            "places.id,places.displayName,places.formattedAddress,places.rating," +
-                    "places.userRatingCount,places.priceLevel,places.location,places.types," +
-                    "places.currentOpeningHours,places.regularOpeningHours,places.photos"
-
-        fun photoUrl(photoName: String, maxWidthPx: Int = 800): String =
-            "${BASE_URL}v1/$photoName/media?maxWidthPx=$maxWidthPx&key=${BuildConfig.MAPS_API_KEY}"
+        private const val BASE_URL = "https://api.geoapify.com/"
 
         fun create(): PlacesApiService {
             val client = OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(15, TimeUnit.SECONDS)
                 .addInterceptor { chain ->
-                    val request = chain.request().newBuilder()
-                        .header("X-Goog-Api-Key", BuildConfig.MAPS_API_KEY)
+                    val original = chain.request()
+                    val url = original.url.newBuilder()
+                        .addQueryParameter("apiKey", BuildConfig.GEOAPIFY_API_KEY)
                         .build()
-                    chain.proceed(request)
+                    chain.proceed(original.newBuilder().url(url).build())
                 }
                 .build()
 
@@ -96,6 +83,51 @@ interface PlacesApiService {
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
                 .create(PlacesApiService::class.java)
+        }
+    }
+}
+
+// ---------------- Wikipedia (ảnh đại diện cho thành phố) ----------------
+data class WikiResponse(@SerializedName("query") val query: WikiQuery? = null)
+data class WikiQuery(@SerializedName("pages") val pages: Map<String, WikiPage>? = null)
+data class WikiPage(
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("thumbnail") val thumbnail: WikiThumbnail? = null
+)
+data class WikiThumbnail(@SerializedName("source") val source: String? = null)
+
+interface WikipediaApiService {
+
+    @GET("w/api.php")
+    suspend fun fetchImage(
+        @Query("titles") title: String,
+        @Query("action") action: String = "query",
+        @Query("prop") prop: String = "pageimages",
+        @Query("format") format: String = "json",
+        @Query("pithumbsize") thumbSize: Int = 800,
+        @Query("redirects") redirects: Int = 1
+    ): WikiResponse
+
+    companion object {
+        fun create(lang: String): WikipediaApiService {
+            val client = OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    chain.proceed(
+                        chain.request().newBuilder()
+                            .header("User-Agent", "TravelApp/1.0 (Android)")
+                            .build()
+                    )
+                }
+                .build()
+
+            return Retrofit.Builder()
+                .baseUrl("https://$lang.wikipedia.org/")
+                .client(client)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(WikipediaApiService::class.java)
         }
     }
 }

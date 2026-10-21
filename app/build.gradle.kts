@@ -18,7 +18,7 @@ android {
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
 
         // Đẩy key vào BuildConfig để gọi trong file Kotlin
-        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
+        buildConfigField("String", "GEOAPIFY_API_KEY", "\"${properties.getProperty("GEOAPIFY_API_KEY") ?: ""}\"")
         buildConfigField("String", "GEMINI_MODEL", "\"gemini-3.8-flash\"")
         buildConfigField("String", "WEATHER_API_KEY", "\"${properties.getProperty("WEATHER_API_KEY") ?: ""}\"")
 

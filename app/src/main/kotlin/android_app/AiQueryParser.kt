@@ -8,10 +8,12 @@ import com.travel.android_app.BuildConfig
 import kotlinx.coroutines.CancellationException
 
 data class ParsedPlaceQuery(
-    /** Câu tìm kiếm tự nhiên để gửi thẳng cho Google Maps */
-    @SerializedName("searchQuery") val searchQuery: String? = null,
-    /** true nếu người dùng muốn tìm quanh vị trí hiện tại của họ */
-    @SerializedName("nearby") val nearby: Boolean = false
+    @SerializedName("categories") val categories: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("location") val location: String? = null,
+    @SerializedName("nearby") val nearby: Boolean = false,
+    /** true nếu người dùng chỉ nhập tên một địa danh/thành phố, không kèm loại hình */
+    @SerializedName("destinationOnly") val destinationOnly: Boolean = false
 )
 
 class AiQueryParser(
@@ -34,21 +36,24 @@ class AiQueryParser(
         if (input.isEmpty()) return ParsedPlaceQuery()
 
         val promptText = """
-            Bạn giúp một ứng dụng du lịch chuyển câu người dùng nhập thành câu tìm kiếm cho Google Maps.
+            Bạn giúp ứng dụng du lịch chuyển câu người dùng thành tham số tìm kiếm địa điểm.
             Câu người dùng: "$input"
 
-            Quy tắc:
-            - searchQuery: câu tìm kiếm ngắn gọn, tự nhiên, giữ nguyên ngôn ngữ của người dùng. Giữ tên thương hiệu, loại hình (quán cà phê, nhà hàng, khách sạn, điểm tham quan...) và địa danh nếu có. Bỏ các từ thừa như "tìm", "gần đây", "cho tôi". Nếu người dùng chỉ nhập một địa danh thì tìm các điểm tham quan ở đó.
-            - nearby: true nếu người dùng muốn tìm quanh vị trí hiện tại của họ (ví dụ "gần đây", "gần tôi", "near me"), ngược lại false.
+            Trả về JSON với các trường:
+            - categories: một hoặc nhiều danh mục, ngăn cách bằng dấu phẩy, CHỈ chọn từ danh sách: tourism.sights, beach, leisure.park, entertainment.culture, catering.restaurant, catering.cafe, catering.fast_food, catering.bar, accommodation.hotel, accommodation.hostel, commercial.shopping_mall, entertainment. Nếu chỉ nhập địa danh thì dùng "tourism.sights,beach,leisure.park,entertainment.culture".
+            - name: tên thương hiệu/quán cụ thể nếu có, còn lại null. Không đưa loại hình chung (cà phê, nhà hàng) vào đây.
+            - location: tên khu vực/địa danh nếu có (thành phố, quận, địa danh), còn lại null.
+            - nearby: true nếu người dùng muốn tìm quanh vị trí của họ ("gần đây", "gần tôi", "near me"), ngược lại false.
+            - destinationOnly: true nếu người dùng CHỈ nhập tên một địa danh/thành phố, không kèm loại hình hay thương hiệu; ngược lại false.
 
-            Chỉ trả về JSON: {"searchQuery": "...", "nearby": true hoặc false}
+            Chỉ trả về JSON: {"categories": "...", "name": null, "location": null, "nearby": false, "destinationOnly": false}
         """.trimIndent()
 
         return try {
             val raw = generativeModel.generateContent(promptText).text.orEmpty()
-            val cleanJson = raw.replace("```json", "").replace("```", "").trim()
-            val parsed = gson.fromJson(cleanJson, ParsedPlaceQuery::class.java)
-            if (parsed?.searchQuery.isNullOrBlank()) fallback(input) else parsed
+            val clean = raw.replace("```json", "").replace("```", "").trim()
+            val parsed = gson.fromJson(clean, ParsedPlaceQuery::class.java)
+            if (parsed == null || parsed.categories.isNullOrBlank()) fallback(input) else parsed
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -57,6 +62,11 @@ class AiQueryParser(
         }
     }
 
-    // Gemini lỗi thì dùng nguyên văn người dùng nhập, không tự đoán từ khóa
-    private fun fallback(input: String) = ParsedPlaceQuery(searchQuery = input, nearby = false)
+    // Gemini lỗi: coi nguyên văn là tên địa danh
+    private fun fallback(input: String) = ParsedPlaceQuery(
+        categories = "tourism.sights,beach,leisure.park,entertainment.culture",
+        location = input,
+        nearby = false,
+        destinationOnly = true
+    )
 }

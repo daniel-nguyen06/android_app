@@ -10,39 +10,22 @@ class TravelBackendService(
     private val weatherKey: String = BuildConfig.WEATHER_API_KEY
 ) {
 
-    private companion object {
-        const val NEARBY_RADIUS_METERS = 5000.0
-    }
-
-    suspend fun searchAndFilterPlaces(
-        query: String,
-        category: String? = null,
-        minRating: Double = 0.0,
-        userLat: Double? = null,
-        userLng: Double? = null
+    /** Tìm địa điểm quanh một toạ độ (bán kính mét) theo danh mục Geoapify */
+    suspend fun searchNearby(
+        categories: String,
+        lat: Double,
+        lng: Double,
+        radiusMeters: Int = 5000
     ): List<PlaceItem> {
-        val trimmed = query.trim()
-        if (trimmed.isEmpty()) return emptyList()
-
         return try {
-            val bias = if (userLat != null && userLng != null) {
-                LocationBias(Circle(LatLngLiteral(userLat, userLng), NEARBY_RADIUS_METERS))
-            } else null
-
-            val response = placesApi.searchText(
-                TextSearchRequest(
-                    textQuery = trimmed,
-                    languageCode = Locale.getDefault().language,
-                    includedType = category,
-                    locationBias = bias
-                )
-            )
-
-            response.places.orEmpty()
-                .mapNotNull { it.toPlaceItem(userLat, userLng) }
-                .filter { it.rating >= minRating }
+            placesApi.searchPlaces(
+                categories = categories,
+                filter = "circle:$lng,$lat,$radiusMeters",
+                bias = "proximity:$lng,$lat",
+                lang = Locale.getDefault().language
+            ).features.orEmpty()
+                .mapNotNull { it.toPlaceItem(lat, lng) }
                 .sortedBy { it.distanceInKm }
-
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

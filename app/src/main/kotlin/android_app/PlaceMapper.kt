@@ -1,7 +1,11 @@
 package android_app
 
-import java.util.Calendar
 import kotlin.math.*
+
+/** Đánh dấu một PlaceItem là thành phố/khu vực (hiển thị ghim ở đầu danh sách) */
+const val CITY_PLACE_TYPE = "place.city"
+
+private val CITY_RESULT_TYPES = setOf("city", "county", "state", "district", "suburb", "locality", "country")
 
 internal fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371.0
@@ -12,52 +16,58 @@ internal fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double)
     return Math.round(r * c * 100.0) / 100.0
 }
 
-private fun priceLevelToInt(level: String?): Int = when (level) {
-    "PRICE_LEVEL_FREE" -> 0
-    "PRICE_LEVEL_INEXPENSIVE" -> 1
-    "PRICE_LEVEL_MODERATE" -> 2
-    "PRICE_LEVEL_EXPENSIVE" -> 3
-    "PRICE_LEVEL_VERY_EXPENSIVE" -> 4
-    else -> 0
-}
+/** Kết quả geocode có phải là một thành phố/khu vực không */
+internal fun GeoapifyFeature.isCityLike(): Boolean =
+    properties?.resultType in CITY_RESULT_TYPES
 
-private fun openingText(hours: NewOpeningHours?): String {
-    if (hours == null) return ""
-    val status = when (hours.openNow) {
-        true -> "Đang mở cửa"
-        false -> "Đã đóng cửa"
-        null -> ""
-    }
-    // weekdayDescriptions bắt đầu từ Thứ Hai (index 0)
-    val dow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) // CN=1, T2=2...
-    val today = hours.weekdayDescriptions?.getOrNull((dow + 5) % 7).orEmpty()
-    return listOf(status, today).filter { it.isNotBlank() }.joinToString(" · ")
-}
+/** Tên hiển thị của khu vực từ kết quả geocode */
+internal fun GeoapifyFeature.areaName(): String? =
+    properties?.let { it.name ?: it.city ?: it.addressLine1 }?.takeIf { it.isNotBlank() }
 
-/** Chuyển dữ liệu Places API (New) sang model hiển thị. Trả null nếu thiếu dữ liệu bắt buộc. */
-internal fun NewPlace.toPlaceItem(userLat: Double?, userLng: Double?): PlaceItem? {
-    val placeId = id ?: return null
-    val name = displayName?.text ?: return null
-    val lat = location?.latitude ?: return null
-    val lng = location.longitude
-
-    val distKm = if (userLat != null && userLng != null) haversineKm(userLat, userLng, lat, lng) else 0.0
-    val level = priceLevelToInt(priceLevel)
-    val imageUrl = photos?.firstOrNull { !it.name.isNullOrBlank() }
-        ?.name?.let { PlacesApiService.photoUrl(it) }.orEmpty()
-    val address = formattedAddress.orEmpty()
+/** Tạo thẻ thành phố từ kết quả geocode */
+internal fun GeoapifyFeature.toCityItem(imageUrl: String, userLat: Double?, userLng: Double?): PlaceItem? {
+    val p = properties ?: return null
+    val name = areaName() ?: return null
+    val lat = p.lat ?: return null
+    val lng = p.lon ?: return null
+    val address = p.formatted.orEmpty()
 
     return PlaceItem(
-        placeId = placeId,
+        placeId = p.placeId ?: "city:$lat,$lng",
         name = name,
         vicinity = address,
-        rating = rating ?: 0.0,
-        priceLevel = level,
-        estimatedBudget = if (level > 0) "$".repeat(level) else "",
-        openingHours = openingText(currentOpeningHours ?: regularOpeningHours),
         description = address,
         imageUrl = imageUrl,
-        types = types ?: emptyList(),
+        types = listOf(CITY_PLACE_TYPE),
+        geometry = Geometry(location = LatLng(lat, lng)),
+        distanceInKm = if (userLat != null && userLng != null) haversineKm(userLat, userLng, lat, lng) else 0.0
+    )
+}
+
+/** Chuyển dữ liệu Geoapify/OSM sang model hiển thị. Bỏ qua địa điểm không có tên hoặc toạ độ. */
+internal fun GeoapifyFeature.toPlaceItem(userLat: Double?, userLng: Double?): PlaceItem? {
+    val p = properties ?: return null
+    val name = p.name?.takeIf { it.isNotBlank() } ?: return null
+    val lat = p.lat ?: return null
+    val lng = p.lon ?: return null
+    val raw = p.datasource?.raw
+
+    val distKm = if (userLat != null && userLng != null) haversineKm(userLat, userLng, lat, lng) else 0.0
+    val address = p.formatted ?: p.addressLine2.orEmpty()
+    val hours = p.openingHours ?: (raw?.get("opening_hours") as? String).orEmpty()
+    val image = (raw?.get("image") as? String)?.takeIf { it.startsWith("http") }.orEmpty()
+
+    return PlaceItem(
+        placeId = p.placeId ?: "$lat,$lng",
+        name = name,
+        vicinity = address,
+        rating = 0.0,
+        priceLevel = 0,
+        estimatedBudget = "",
+        openingHours = hours,
+        description = address,
+        imageUrl = image,
+        types = p.categories.orEmpty(),
         geometry = Geometry(location = LatLng(lat, lng)),
         distanceInKm = distKm
     )

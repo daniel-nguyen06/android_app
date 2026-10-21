@@ -62,7 +62,7 @@ class PlaceViewModel(
                     it.copy(
                         minRating = 0.0,
                         maxPriceLevel = 4,
-                        sortType = PlaceRepository.SortType.RATING_DESC
+                        sortType = PlaceRepository.SortType.DISTANCE
                     )
                 }
                 applyLocalFiltersAndSort()

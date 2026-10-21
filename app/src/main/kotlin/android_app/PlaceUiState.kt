@@ -13,7 +13,7 @@ data class PlaceUiState(
     val selectedCategory: String? = null,
     val minRating: Double = 0.0,
     val maxPriceLevel: Int = 4,
-    val sortType: PlaceRepository.SortType = PlaceRepository.SortType.RATING_DESC,
+    val sortType: PlaceRepository.SortType = PlaceRepository.SortType.DISTANCE,
 
     /** null cho đến khi lấy được vị trí thật từ LocationTracker */
     val userLat: Double? = null,

@@ -37,14 +37,13 @@ data class PlaceCategory(
 
 val placeCategories = listOf(
     PlaceCategory(id = null, label = "Tất cả", Icons.Default.Place),
-    PlaceCategory(id = "tourist_attraction", label = "Tham quan", Icons.Default.Star),
-    PlaceCategory(id = "lodging", label = "Khách sạn", Icons.Default.Home),
-    PlaceCategory(id = "restaurant", label = "Nhà hàng", Icons.Default.ThumbUp),
-    PlaceCategory(id = "cafe", label = "Cà phê", Icons.Default.Favorite),
-    PlaceCategory(id = "shopping_mall", label = "Mua sắm", Icons.Default.ShoppingCart),
-    PlaceCategory(id = "amusement_park", label = "Vui chơi", Icons.Default.PlayArrow)
+    PlaceCategory(id = "tourism.sights,beach,leisure.park,entertainment.culture", label = "Tham quan", Icons.Default.Star),
+    PlaceCategory(id = "accommodation.hotel", label = "Khách sạn", Icons.Default.Home),
+    PlaceCategory(id = "catering.restaurant", label = "Nhà hàng", Icons.Default.ThumbUp),
+    PlaceCategory(id = "catering.cafe", label = "Cà phê", Icons.Default.Favorite),
+    PlaceCategory(id = "commercial.shopping_mall", label = "Mua sắm", Icons.Default.ShoppingCart),
+    PlaceCategory(id = "entertainment", label = "Vui chơi", Icons.Default.PlayArrow)
 )
-
 /**
  * Thanh cuộn chọn Danh mục Địa điểm (Category Filter Chips)
  */

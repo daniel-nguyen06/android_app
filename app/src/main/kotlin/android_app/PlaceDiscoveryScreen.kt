@@ -219,13 +219,24 @@ fun PlaceDiscoveryScreen(
                     }
 
                     is PlaceScreenStatus.Success -> {
+                        val pinned = status.places.filter { CITY_PLACE_TYPE in it.types }
+                        val rest = status.places.filterNot { CITY_PLACE_TYPE in it.types }
+
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
+                            items(items = pinned, key = { "pin_${it.placeId}" }) { place ->
+                                PlaceCard(
+                                    place = place,
+                                    isFavorite = uiState.favoritePlaceIds.contains(place.placeId),
+                                    onToggleFavorite = { onEvent(PlaceUiEvent.OnToggleFavorite(place.placeId)) },
+                                    onClick = { onEvent(PlaceUiEvent.OnPlaceSelected(place)) }
+                                )
+                            }
                             items(
-                                items = status.places.chunked(2),
+                                items = rest.chunked(2),
                                 key = { chunk -> chunk.first().placeId }
                             ) { rowPlaces ->
                                 Row(
@@ -233,23 +244,16 @@ fun PlaceDiscoveryScreen(
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
                                     for (place in rowPlaces) {
-                                        val isFav = uiState.favoritePlaceIds.contains(place.placeId)
                                         Box(modifier = Modifier.weight(1f)) {
                                             PlaceCard(
                                                 place = place,
-                                                isFavorite = isFav,
-                                                onToggleFavorite = {
-                                                    onEvent(PlaceUiEvent.OnToggleFavorite(place.placeId))
-                                                },
-                                                onClick = {
-                                                    onEvent(PlaceUiEvent.OnPlaceSelected(place))
-                                                }
+                                                isFavorite = uiState.favoritePlaceIds.contains(place.placeId),
+                                                onToggleFavorite = { onEvent(PlaceUiEvent.OnToggleFavorite(place.placeId)) },
+                                                onClick = { onEvent(PlaceUiEvent.OnPlaceSelected(place)) }
                                             )
                                         }
                                     }
-                                    if (rowPlaces.size == 1) {
-                                        Spacer(modifier = Modifier.weight(1f))
-                                    }
+                                    if (rowPlaces.size == 1) Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
                         }
