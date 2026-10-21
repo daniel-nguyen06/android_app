@@ -23,6 +23,10 @@ class PlaceViewModel(
     private var searchJob: Job? = null
     private var rawPlacesList: List<PlaceItem> = emptyList()
 
+    fun updateUserLocation(lat: Double, lng: Double) {
+        _uiState.update { it.copy(userLat = lat, userLng = lng) }
+    }
+
     fun onEvent(event: PlaceUiEvent) {
         when (event) {
             is PlaceUiEvent.OnSearchQueryChanged -> {
@@ -120,9 +124,17 @@ class PlaceViewModel(
 
     private fun toggleFavorite(placeId: String) {
         _uiState.update { state ->
-            val favorites = state.favoritePlaceIds.toMutableSet()
-            if (!favorites.add(placeId)) favorites.remove(placeId)
-            state.copy(favoritePlaceIds = favorites)
+            val ids = state.favoritePlaceIds.toMutableSet()
+            val places = state.favoritePlaces.toMutableMap()
+            if (ids.remove(placeId)) {
+                places.remove(placeId)
+            } else {
+                ids.add(placeId)
+                val place = rawPlacesList.find { it.placeId == placeId }
+                    ?: state.selectedPlace?.takeIf { it.placeId == placeId }
+                if (place != null) places[placeId] = place
+            }
+            state.copy(favoritePlaceIds = ids, favoritePlaces = places)
         }
     }
 }

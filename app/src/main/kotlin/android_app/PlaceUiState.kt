@@ -15,11 +15,14 @@ data class PlaceUiState(
     val maxPriceLevel: Int = 4,
     val sortType: PlaceRepository.SortType = PlaceRepository.SortType.RATING_DESC,
 
-    /** null cho đến khi lấy được vị trí thật từ LocationTracker/LocationHelper */
+    /** null cho đến khi lấy được vị trí thật từ LocationTracker */
     val userLat: Double? = null,
     val userLng: Double? = null,
 
     val favoritePlaceIds: Set<String> = emptySet(),
+    /** Lưu cả địa điểm để tab Yêu thích không mất dữ liệu khi tìm từ khóa khác */
+    val favoritePlaces: Map<String, PlaceItem> = emptyMap(),
+
     val selectedPlace: PlaceItem? = null,
     val status: PlaceScreenStatus = PlaceScreenStatus.Idle
 )

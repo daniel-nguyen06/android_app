@@ -1,6 +1,7 @@
 package android_app
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,26 +9,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.shadow
-import androidx.compose.foundation.background
 import android_app.ui.theme.SunsetCoral
 import android_app.ui.theme.TravelAppTheme
 
 /**
  * Màn hình Khám phá & Tìm kiếm Địa điểm Du lịch.
- * Tách biệt hoàn toàn Stateless Composable UI và State/ViewModel theo Clean Architecture (UDF).
  */
-
 @Composable
 fun PlaceDiscoveryRoute(
     viewModel: PlaceViewModel,
@@ -53,7 +52,7 @@ fun PlaceDiscoveryScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Explore,
                             contentDescription = null,
@@ -79,7 +78,12 @@ fun PlaceDiscoveryScreen(
                 containerColor = SunsetCoral,
                 contentColor = Color.White,
                 shape = RoundedCornerShape(percent = 50),
-                modifier = Modifier.shadow(8.dp, spotColor = SunsetCoral, ambientColor = SunsetCoral, shape = RoundedCornerShape(percent = 50))
+                modifier = Modifier.shadow(
+                    8.dp,
+                    spotColor = SunsetCoral,
+                    ambientColor = SunsetCoral,
+                    shape = RoundedCornerShape(percent = 50)
+                )
             ) {
                 Icon(Icons.Default.Place, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -93,7 +97,7 @@ fun PlaceDiscoveryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // 1. Thẻ Hero (Lời chào & Golden Hour)
+            // 1. Thẻ Hero
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -107,11 +111,11 @@ fun PlaceDiscoveryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            brush = Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color(0xFFFF6B4A), // Sunset Coral
-                                    Color(0xFFFFC24B), // Mango Gold
-                                    Color(0xFF14B8A6)  // Lagoon Teal
+                                    Color(0xFFFF6B4A),
+                                    Color(0xFFFFC24B),
+                                    Color(0xFF14B8A6)
                                 )
                             )
                         )
@@ -130,20 +134,11 @@ fun PlaceDiscoveryScreen(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Giờ vàng hôm nay: 17:15 - 18:30",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color.White,
-                            modifier = Modifier
-                                .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
                     }
                 }
             }
 
-            // 2. Ô Nhập Từ Khóa Tìm Kiếm (Search Field)
+            // 2. Ô tìm kiếm
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { onEvent(PlaceUiEvent.OnSearchQueryChanged(it)) },
@@ -169,7 +164,7 @@ fun PlaceDiscoveryScreen(
                 )
             )
 
-            // 2. Thanh Danh Mục Địa Điểm (Category Chips)
+            // 3. Danh mục
             CategoryChipRow(
                 selectedCategory = uiState.selectedCategory,
                 onCategorySelected = { category ->
@@ -177,28 +172,20 @@ fun PlaceDiscoveryScreen(
                 }
             )
 
-            // 3. Thanh Sắp Xếp & Bộ Lọc Nâng Cao (Sort & Filter)
+            // 4. Sắp xếp & lọc
             FilterAndSortBar(
                 currentSortType = uiState.sortType,
                 minRating = uiState.minRating,
                 maxPriceLevel = uiState.maxPriceLevel,
-                onSortTypeChanged = { sortType ->
-                    onEvent(PlaceUiEvent.OnSortTypeChanged(sortType))
-                },
-                onFilterRatingChanged = { rating ->
-                    onEvent(PlaceUiEvent.OnFilterRatingChanged(rating))
-                },
-                onFilterPriceChanged = { price ->
-                    onEvent(PlaceUiEvent.OnFilterPriceChanged(price))
-                },
-                onClearFilters = {
-                    onEvent(PlaceUiEvent.OnClearFilters)
-                }
+                onSortTypeChanged = { onEvent(PlaceUiEvent.OnSortTypeChanged(it)) },
+                onFilterRatingChanged = { onEvent(PlaceUiEvent.OnFilterRatingChanged(it)) },
+                onFilterPriceChanged = { onEvent(PlaceUiEvent.OnFilterPriceChanged(it)) },
+                onClearFilters = { onEvent(PlaceUiEvent.OnClearFilters) }
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 4. Nội dung chính xử lý 4 Trạng thái (Loading, Success, Empty, Error)
+            // 5. Nội dung chính theo trạng thái
             Crossfade(
                 targetState = uiState.status,
                 label = "ScreenStatusTransition",
@@ -218,14 +205,10 @@ fun PlaceDiscoveryScreen(
                         }
                     }
 
-                    is PlaceScreenStatus.Loading -> {
-                        LoadingStateView()
-                    }
+                    is PlaceScreenStatus.Loading -> LoadingStateView()
 
                     is PlaceScreenStatus.Empty -> {
-                        EmptyStateView(
-                            onClearFilters = { onEvent(PlaceUiEvent.OnClearFilters) }
-                        )
+                        EmptyStateView(onClearFilters = { onEvent(PlaceUiEvent.OnClearFilters) })
                     }
 
                     is PlaceScreenStatus.Error -> {
@@ -264,7 +247,6 @@ fun PlaceDiscoveryScreen(
                                             )
                                         }
                                     }
-                                    // Empty box if chunk size is 1 to maintain grid structure
                                     if (rowPlaces.size == 1) {
                                         Spacer(modifier = Modifier.weight(1f))
                                     }
@@ -276,12 +258,11 @@ fun PlaceDiscoveryScreen(
             }
         }
 
-        // 5. BottomSheet Chi Tiết khi chọn một Địa điểm
+        // 6. BottomSheet chi tiết địa điểm
         uiState.selectedPlace?.let { selectedPlace ->
-            val isFav = uiState.favoritePlaceIds.contains(selectedPlace.placeId)
             PlaceDetailBottomSheet(
                 place = selectedPlace,
-                isFavorite = isFav,
+                isFavorite = uiState.favoritePlaceIds.contains(selectedPlace.placeId),
                 onToggleFavorite = {
                     onEvent(PlaceUiEvent.OnToggleFavorite(selectedPlace.placeId))
                 },
@@ -294,7 +275,7 @@ fun PlaceDiscoveryScreen(
 }
 
 // ---------------------------------------------------------------------------
-// SCREEN PREVIEWS (LIGHT & DARK MODE)
+// PREVIEWS
 // ---------------------------------------------------------------------------
 
 private val mockPlaces = listOf(
@@ -359,9 +340,7 @@ fun PlaceDiscoveryScreenSuccessDarkPreview() {
 fun PlaceDiscoveryScreenLoadingPreview() {
     TravelAppTheme {
         PlaceDiscoveryScreen(
-            uiState = PlaceUiState(
-                status = PlaceScreenStatus.Loading
-            ),
+            uiState = PlaceUiState(status = PlaceScreenStatus.Loading),
             onEvent = {}
         )
     }

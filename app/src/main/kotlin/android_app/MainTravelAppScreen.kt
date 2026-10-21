@@ -1,5 +1,7 @@
 package android_app
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,16 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
+import androidx.compose.ui.unit.sp
 import android_app.ui.theme.TravelAppTheme
 import com.travel.android_app.BuildConfig
 
 /**
-- Danh sách các Tab điều hướng của Ứng dụng Du lịch
+ * Các Tab điều hướng của ứng dụng
  */
 enum class TravelTab(
     val title: String,
@@ -45,7 +45,7 @@ enum class NavigationRoute {
 }
 
 /**
- * Shell chính cho ứng dụng du lịch chứa Bottom Navigation Bar.
+ * Shell chính của ứng dụng, chứa Bottom Navigation Bar.
  */
 @Composable
 fun MainTravelAppScreen(
@@ -54,9 +54,8 @@ fun MainTravelAppScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf(TravelTab.EXPLORE) }
-    var currentRoute by remember { mutableStateOf(NavigationRoute.LOGIN) } // Start at login for demo
+    var currentRoute by remember { mutableStateOf(NavigationRoute.LOGIN) }
 
-    // If we are not on the home route (tabs), show the full screen sub-routes
     if (currentRoute != NavigationRoute.HOME) {
         when (currentRoute) {
             NavigationRoute.LOGIN -> {
@@ -93,7 +92,7 @@ fun MainTravelAppScreen(
             }
             else -> {}
         }
-        return // Return early to not show Scaffold with BottomNav
+        return
     }
 
     Scaffold(
@@ -113,7 +112,6 @@ fun MainTravelAppScreen(
                             .clickable { selectedTab = tab },
                         contentAlignment = Alignment.Center
                     ) {
-                        // Top Border for Active Tab
                         if (isSelected) {
                             Box(
                                 modifier = Modifier
@@ -121,7 +119,7 @@ fun MainTravelAppScreen(
                                     .fillMaxWidth()
                                     .height(3.dp)
                                     .padding(horizontal = 16.dp)
-                                    .background(MaterialTheme.colorScheme.primary) // Sunset Coral border
+                                    .background(MaterialTheme.colorScheme.primary)
                             )
                         }
 
@@ -162,7 +160,10 @@ fun MainTravelAppScreen(
                     FavoritesTabScreen(viewModel = placeViewModel)
                 }
                 TravelTab.TRIPS -> {
-                    TripsTabScreen()
+                    TripsTabScreen(
+                        viewModel = tripViewModel,
+                        onCreateTrip = { currentRoute = NavigationRoute.CREATE_TRIP }
+                    )
                 }
                 TravelTab.MENU -> {
                     android_app.ui.screens.MenuScreen(
@@ -171,8 +172,8 @@ fun MainTravelAppScreen(
                         onNavigateToCreateItinerary = { currentRoute = NavigationRoute.CREATE_ITINERARY },
                         onNavigateToViewItinerary = { currentRoute = NavigationRoute.VIEW_ITINERARY },
                         onLogout = {
-                            selectedTab = TravelTab.EXPLORE // Reset tab
-                            currentRoute = NavigationRoute.LOGIN // Navigate to login
+                            selectedTab = TravelTab.EXPLORE
+                            currentRoute = NavigationRoute.LOGIN
                         }
                     )
                 }
@@ -182,7 +183,7 @@ fun MainTravelAppScreen(
 }
 
 /**
-- Tab Danh sách Địa điểm Yêu thích
+ * Tab Địa điểm Yêu thích
  */
 @Composable
 fun FavoritesTabScreen(
@@ -190,6 +191,7 @@ fun FavoritesTabScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val favPlaces = uiState.favoritePlaces.values.toList()
 
     Column(
         modifier = modifier
@@ -197,13 +199,13 @@ fun FavoritesTabScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "Địa Điểm Đã Lưu (${uiState.favoritePlaceIds.size})",
+            text = "Địa Điểm Đã Lưu (${favPlaces.size})",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        if (uiState.favoritePlaceIds.isEmpty()) {
+        if (favPlaces.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -229,11 +231,6 @@ fun FavoritesTabScreen(
                 }
             }
         } else {
-            val favPlaces = when (val s = uiState.status) {
-                is PlaceScreenStatus.Success -> s.places.filter { uiState.favoritePlaceIds.contains(it.placeId) }
-                else -> emptyList()
-            }
-
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -250,62 +247,114 @@ fun FavoritesTabScreen(
                 }
             }
         }
+
+        uiState.selectedPlace?.let { selected ->
+            PlaceDetailBottomSheet(
+                place = selected,
+                isFavorite = uiState.favoritePlaceIds.contains(selected.placeId),
+                onToggleFavorite = { viewModel.onEvent(PlaceUiEvent.OnToggleFavorite(selected.placeId)) },
+                onDismissRequest = { viewModel.onEvent(PlaceUiEvent.OnPlaceSelected(null)) }
+            )
+        }
     }
 }
 
 /**
-- Tab Quản lý Chuyến đi
+ * Tab Quản lý Chuyến đi (đọc dữ liệu thật từ TripViewModel)
  */
 @Composable
-fun TripsTabScreen(modifier: Modifier = Modifier) {
-    Box(
+fun TripsTabScreen(
+    viewModel: TripViewModel,
+    onCreateTrip: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
+            .padding(16.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.Luggage,
-                contentDescription = null,
-                modifier = Modifier.size(72.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = "Quản Lý Chuyến Đi",
+                text = "Chuyến đi của tôi (${uiState.trips.size})",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Lên kế hoạch cho các hành trình sắp tới và theo dõi lịch trình của bạn.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = { /* Tạo chuyến đi mới */ }) {
+            Button(onClick = onCreateTrip) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Tạo chuyến đi mới")
+                Text("Tạo mới")
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (uiState.trips.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.Luggage,
+                        contentDescription = null,
+                        modifier = Modifier.size(72.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Bạn chưa có chuyến đi nào.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(uiState.trips, key = { it.tripId }) { trip ->
+                    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                trip.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(trip.destination, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "${trip.startDate} - ${trip.endDate} · ${trip.totalDays} ngày",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            trip.budget?.let {
+                                Text(
+                                    "Dự kiến: ${it.totalEstimated}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// PREVIEWS - CẬP NHẬT CHO GEOAPIFY & GEMINI PARSER
+// PREVIEWS
 // ---------------------------------------------------------------------------
 
 @Preview(name = "Main Screen - Light Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenLightPreview() {
-    val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
-    val budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY)
-    val sampleRepo = PlaceRepository(aiParser = aiParser)
-    val tripRepo = TripRepository(budgetService = budgetService)
-    val placeVM = PlaceViewModel(sampleRepo)
-    val tripVM = TripViewModel(tripRepo)
+    val placeVM = PlaceViewModel(
+        PlaceRepository(aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY))
+    )
+    val tripVM = TripViewModel(
+        TripRepository(budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY))
+    )
     TravelAppTheme(darkTheme = false) {
         MainTravelAppScreen(placeViewModel = placeVM, tripViewModel = tripVM)
     }
@@ -314,12 +363,12 @@ fun MainTravelAppScreenLightPreview() {
 @Preview(name = "Main Screen - Dark Theme", showBackground = true)
 @Composable
 fun MainTravelAppScreenDarkPreview() {
-    val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
-    val budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY)
-    val sampleRepo = PlaceRepository(aiParser = aiParser)
-    val tripRepo = TripRepository(budgetService = budgetService)
-    val placeVM = PlaceViewModel(sampleRepo)
-    val tripVM = TripViewModel(tripRepo)
+    val placeVM = PlaceViewModel(
+        PlaceRepository(aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY))
+    )
+    val tripVM = TripViewModel(
+        TripRepository(budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY))
+    )
     TravelAppTheme(darkTheme = true) {
         MainTravelAppScreen(placeViewModel = placeVM, tripViewModel = tripVM)
     }

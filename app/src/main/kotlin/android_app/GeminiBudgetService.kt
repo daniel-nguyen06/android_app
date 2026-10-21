@@ -1,15 +1,32 @@
 package android_app
 
 import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.generationConfig
 import com.google.gson.Gson
+import com.travel.android_app.BuildConfig
+import kotlinx.coroutines.CancellationException
+import java.util.Locale
+
+private data class BudgetEstimateDto(
+    val transportCost: Long = 0,
+    val accommodationCost: Long = 0,
+    val foodCost: Long = 0,
+    val entertainmentCost: Long = 0,
+    val summaryAdvice: String = ""
+)
 
 class GeminiBudgetService(
-    private val geminiApiKey: String
+    geminiApiKey: String,
+    modelName: String = BuildConfig.GEMINI_MODEL
 ) {
     private val gson = Gson()
     private val generativeModel = GenerativeModel(
-        modelName = "gemini-pro",
-        apiKey = geminiApiKey
+        modelName = modelName,
+        apiKey = geminiApiKey,
+        generationConfig = generationConfig {
+            responseMimeType = "application/json"
+            temperature = 0.2f
+        }
     )
 
     suspend fun estimateBudget(
@@ -18,57 +35,44 @@ class GeminiBudgetService(
         stopNames: List<String>,
         peopleCount: Int = 1
     ): BudgetBreakdown {
-        val stopsDescription = if (stopNames.isNotEmpty()) {
-            stopNames.joinToString(", ")
-        } else {
-            "Khám phá tự do quanh khu vực"
-        }
+        val stopsDescription = if (stopNames.isNotEmpty()) stopNames.joinToString(", ")
+        else "Khám phá tự do quanh khu vực"
 
         val promptText = """
             Bạn là trợ lý tư vấn tài chính du lịch tại Việt Nam.
-            Hãy ước tính chi tiết ngân sách thực tế bằng tiền VNĐ cho chuyến đi:
-            - Điểm đến chính: $destination
+            Ước tính ngân sách thực tế bằng VNĐ cho chuyến đi:
+            - Điểm đến: $destination
             - Thời gian: $days ngày
-            - Số lượng người: $peopleCount người
-            - Các trạm/địa điểm dự kiến ghé: $stopsDescription
+            - Số người: $peopleCount người (tính tổng cho cả nhóm)
+            - Các địa điểm dự kiến ghé: $stopsDescription
 
-            Trả về DUY NHẤT một chuỗi JSON hợp lệ không có markdown theo định dạng:
-            {
-               "transportCost": "ước tính di chuyển (ví dụ: 600.000đ)",
-               "accommodationCost": "ước tính lưu trú/khách sạn (ví dụ: 1.500.000đ)",
-               "foodCost": "ước tính ăn uống (ví dụ: 1.200.000đ)",
-               "entertainmentCost": "vé tham quan, giải trí (ví dụ: 400.000đ)",
-               "totalEstimated": "tổng chi phí ước tính (ví dụ: 3.700.000đ)",
-               "summaryAdvice": "1-2 câu lời khuyên ngắn gọn để tiết kiệm ngân sách"
-            }
+            Chỉ trả về JSON. Mọi số tiền là SỐ NGUYÊN theo VNĐ, không có dấu chấm, dấu phẩy hay chữ:
+            {"transportCost": 0, "accommodationCost": 0, "foodCost": 0, "entertainmentCost": 0, "summaryAdvice": "1-2 câu lời khuyên tiết kiệm"}
         """.trimIndent()
 
-        return try {
-            val response = generativeModel.generateContent(promptText)
-            val rawText = response.text.orEmpty()
+        try {
+            val raw = generativeModel.generateContent(promptText).text.orEmpty()
+            val clean = raw.replace("```json", "").replace("```", "").trim()
+            val dto = gson.fromJson(clean, BudgetEstimateDto::class.java)
+                ?: throw IllegalStateException("Gemini trả về dữ liệu rỗng")
 
-            val cleanJson = rawText
-                .replace("```json", "")
-                .replace("```", "")
-                .trim()
-
-            gson.fromJson(cleanJson, BudgetBreakdown::class.java) ?: fallbackBudget(days)
+            val total = dto.transportCost + dto.accommodationCost + dto.foodCost + dto.entertainmentCost
+            return BudgetBreakdown(
+                transportCost = formatVnd(dto.transportCost),
+                accommodationCost = formatVnd(dto.accommodationCost),
+                foodCost = formatVnd(dto.foodCost),
+                entertainmentCost = formatVnd(dto.entertainmentCost),
+                totalEstimated = formatVnd(total),
+                summaryAdvice = dto.summaryAdvice
+            )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            e.printStackTrace()
-            println(">>> [LỖI GEMINI BUDGET CHI TIẾT]: ${e::class.simpleName} - ${e.message}")
-            fallbackBudget(days)
+            println(">>> [Gemini Budget lỗi] ${e::class.simpleName}: ${e.message}")
+            throw IllegalStateException("Không tính được ngân sách: ${e.message}")
         }
     }
 
-    private fun fallbackBudget(days: Int): BudgetBreakdown {
-        val total = days * 1_000_000
-        return BudgetBreakdown(
-            transportCost = "500.000đ",
-            accommodationCost = "${days * 500_000}đ",
-            foodCost = "${days * 350_000}đ",
-            entertainmentCost = "200.000đ",
-            totalEstimated = "${String.format("%,d", total)}đ",
-            summaryAdvice = "Ước tính tiêu chuẩn trung bình khoảng 1.000.000đ/ngày/người."
-        )
-    }
+    private fun formatVnd(amount: Long): String =
+        String.format(Locale.US, "%,d", amount).replace(',', '.') + "đ"
 }
