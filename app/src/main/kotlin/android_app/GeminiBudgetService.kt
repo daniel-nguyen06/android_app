@@ -1,12 +1,16 @@
 package android_app
 
+import com.google.ai.client.generativeai.GenerativeModel
 import com.google.gson.Gson
 
 class GeminiBudgetService(
-    private val geminiApiKey: String,
-    private val geminiApi: GeminiApiService = GeminiApiService.create()
+    private val geminiApiKey: String
 ) {
     private val gson = Gson()
+    private val generativeModel = GenerativeModel(
+        modelName = "gemini-pro",
+        apiKey = geminiApiKey
+    )
 
     suspend fun estimateBudget(
         destination: String,
@@ -40,24 +44,8 @@ class GeminiBudgetService(
         """.trimIndent()
 
         return try {
-            val requestBody = GeminiRequest(
-                contents = listOf(
-                    GeminiContent(parts = listOf(GeminiPart(text = promptText)))
-                )
-            )
-
-            val response = geminiApi.generateContent(
-                apiKey = geminiApiKey,
-                request = requestBody
-            )
-
-            val rawText = response.candidates
-                ?.firstOrNull()
-                ?.content
-                ?.parts
-                ?.firstOrNull()
-                ?.text
-                .orEmpty()
+            val response = generativeModel.generateContent(promptText)
+            val rawText = response.text.orEmpty()
 
             val cleanJson = rawText
                 .replace("```json", "")
@@ -66,7 +54,8 @@ class GeminiBudgetService(
 
             gson.fromJson(cleanJson, BudgetBreakdown::class.java) ?: fallbackBudget(days)
         } catch (e: Exception) {
-            println(">>> [LỖI GEMINI BUDGET]: ${e.message}")
+            e.printStackTrace()
+            println(">>> [LỖI GEMINI BUDGET CHI TIẾT]: ${e::class.simpleName} - ${e.message}")
             fallbackBudget(days)
         }
     }

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -204,6 +205,19 @@ fun PlaceDiscoveryScreen(
                 modifier = Modifier.weight(1f)
             ) { status ->
                 when (status) {
+                    is PlaceScreenStatus.Idle -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Nhập từ khóa tìm kiếm để khám phá địa điểm...",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     is PlaceScreenStatus.Loading -> {
                         LoadingStateView()
                     }

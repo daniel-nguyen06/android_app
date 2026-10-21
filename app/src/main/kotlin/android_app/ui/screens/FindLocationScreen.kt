@@ -117,6 +117,15 @@ fun FindLocationScreen(
             )
             
             when (val status = uiState.status) {
+                is PlaceScreenStatus.Idle -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Nhập từ khóa để tìm kiếm địa điểm...",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 is PlaceScreenStatus.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()

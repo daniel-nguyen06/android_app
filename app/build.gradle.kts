@@ -8,6 +8,7 @@ android {
     namespace = "com.travel.android_app"
     compileSdk = 34
 
+
     defaultConfig {
         val properties = Properties()
         properties.load(project.rootProject.file("local.properties").inputStream())
@@ -17,6 +18,8 @@ android {
 
         // Đẩy key vào BuildConfig để gọi trong file Kotlin
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
+        buildConfigField("String", "GEMINI_MODEL", "\"gemini-3.8-flash\"")
+        buildConfigField("String", "WEATHER_API_KEY", "\"${properties.getProperty("WEATHER_API_KEY") ?: ""}\"")
 
         // Đẩy key vào Manifest để Google Maps SDK nhận diện
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
@@ -93,9 +96,12 @@ dependencies {
     // Thư viện hỗ trợ hàm .await() cho Coroutine
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
-    // Backend: Retrofit & Gson (Gọi Places API, Weather API,AI API)
+    // Backend: Retrofit & Gson (Gọi Places API, Weather API)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // Google GenAI official SDK
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
     
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

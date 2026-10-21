@@ -1,71 +1,62 @@
 package android_app
 
+import com.google.ai.client.generativeai.GenerativeModel
+import com.google.ai.client.generativeai.type.generationConfig
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import com.travel.android_app.BuildConfig
+import kotlinx.coroutines.CancellationException
 
 data class ParsedPlaceQuery(
-    @SerializedName("cleanName") val cleanName: String? = null,
-    @SerializedName("category") val category: String = "catering,tourism",
-    @SerializedName("locationHint") val locationHint: String? = null
+    /** Câu tìm kiếm tự nhiên để gửi thẳng cho Google Maps */
+    @SerializedName("searchQuery") val searchQuery: String? = null,
+    /** true nếu người dùng muốn tìm quanh vị trí hiện tại của họ */
+    @SerializedName("nearby") val nearby: Boolean = false
 )
 
 class AiQueryParser(
-    private val geminiApiKey: String,
-    private val geminiApi: GeminiApiService = GeminiApiService.create()
+    geminiApiKey: String,
+    modelName: String = BuildConfig.GEMINI_MODEL
 ) {
     private val gson = Gson()
 
+    private val generativeModel = GenerativeModel(
+        modelName = modelName,
+        apiKey = geminiApiKey,
+        generationConfig = generationConfig {
+            responseMimeType = "application/json"
+            temperature = 0f
+        }
+    )
+
     suspend fun parseUserPrompt(userInput: String): ParsedPlaceQuery {
-        if (userInput.isBlank()) return ParsedPlaceQuery()
+        val input = userInput.trim()
+        if (input.isEmpty()) return ParsedPlaceQuery()
 
         val promptText = """
-            Phân tích câu tìm kiếm: "$userInput"
-            Trả về DUY NHẤT một chuỗi JSON hợp lệ không có markdown:
-            {"cleanName": "Tên thương hiệu/quán chính (bỏ từ: tìm, quán, tiệm, coffee, cà phê, gần đây), hoặc null nếu chỉ tìm loại hình chung", "category": "catering.cafe hoặc catering.restaurant hoặc accommodation.hotel hoặc tourism", "locationHint": "khu vực/địa danh nếu có, còn lại null"}
+            Bạn giúp một ứng dụng du lịch chuyển câu người dùng nhập thành câu tìm kiếm cho Google Maps.
+            Câu người dùng: "$input"
+
+            Quy tắc:
+            - searchQuery: câu tìm kiếm ngắn gọn, tự nhiên, giữ nguyên ngôn ngữ của người dùng. Giữ tên thương hiệu, loại hình (quán cà phê, nhà hàng, khách sạn, điểm tham quan...) và địa danh nếu có. Bỏ các từ thừa như "tìm", "gần đây", "cho tôi". Nếu người dùng chỉ nhập một địa danh thì tìm các điểm tham quan ở đó.
+            - nearby: true nếu người dùng muốn tìm quanh vị trí hiện tại của họ (ví dụ "gần đây", "gần tôi", "near me"), ngược lại false.
+
+            Chỉ trả về JSON: {"searchQuery": "...", "nearby": true hoặc false}
         """.trimIndent()
 
         return try {
-            val requestBody = GeminiRequest(
-                contents = listOf(
-                    GeminiContent(
-                        parts = listOf(GeminiPart(text = promptText))
-                    )
-                )
-            )
-
-            val response = geminiApi.generateContent(
-                apiKey = geminiApiKey,
-                request = requestBody
-            )
-
-            val rawText = response.candidates
-                ?.firstOrNull()
-                ?.content
-                ?.parts
-                ?.firstOrNull()
-                ?.text
-                .orEmpty()
-
-            val cleanJson = rawText
-                .replace("```json", "")
-                .replace("```", "")
-                .trim()
-
-            gson.fromJson(cleanJson, ParsedPlaceQuery::class.java) ?: fallbackParse(userInput)
+            val raw = generativeModel.generateContent(promptText).text.orEmpty()
+            val cleanJson = raw.replace("```json", "").replace("```", "").trim()
+            val parsed = gson.fromJson(cleanJson, ParsedPlaceQuery::class.java)
+            if (parsed?.searchQuery.isNullOrBlank()) fallback(input) else parsed
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            println(">>> [LỖI KẾT NỐI GEMINI]: ${e.message}")
-            fallbackParse(userInput)
+            println(">>> [Gemini lỗi] ${e::class.simpleName}: ${e.message}")
+            fallback(input)
         }
     }
 
-    private fun fallbackParse(input: String): ParsedPlaceQuery {
-        val lower = input.lowercase()
-        val cat = when {
-            lower.contains("cafe") || lower.contains("cà phê") || lower.contains("coffee") -> "catering.cafe"
-            lower.contains("ăn") || lower.contains("nhà hàng") || lower.contains("quán") -> "catering.restaurant"
-            else -> "catering,tourism"
-        }
-        val clean = input.replace(Regex("(?i)(tìm|quán|cà phê|cafe|coffee|gần đây)"), "").trim()
-        return ParsedPlaceQuery(cleanName = clean.ifBlank { null }, category = cat)
-    }
+    // Gemini lỗi thì dùng nguyên văn người dùng nhập, không tự đoán từ khóa
+    private fun fallback(input: String) = ParsedPlaceQuery(searchQuery = input, nearby = false)
 }

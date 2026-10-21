@@ -1,6 +1,5 @@
 package android_app
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,16 +13,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import coil.compose.AsyncImage
-import android_app.ui.theme.TravelAppTheme
 import android_app.ui.theme.Lavender
 import android_app.ui.theme.LavenderSoft
 import android_app.ui.theme.MangoGold
@@ -82,8 +78,7 @@ fun CategoryChipRow(
 }
 
 /**
- * Thanh Bộ Lọc Nâng Cao & Tùy Chọn Sắp Xếp (Sort & Filter Bar)
- * Dùng PlaceRepository.SortType để đồng bộ với ViewModel và UiState
+ * Thanh Bộ Lọc Nâng Cao & Tùy Chọn Sắp Xếp
  */
 @Composable
 fun FilterAndSortBar(
@@ -106,7 +101,6 @@ fun FilterAndSortBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Nút Sắp xếp
         Box {
             AssistChip(
                 onClick = { showSortMenu = true },
@@ -157,7 +151,6 @@ fun FilterAndSortBar(
             }
         }
 
-        // Nút mở Dialog Bộ lọc
         FilterChip(
             selected = minRating > 0 || maxPriceLevel < 4,
             onClick = { showFilterDialog = true },
@@ -166,7 +159,6 @@ fun FilterAndSortBar(
         )
     }
 
-    // Dialog Bộ lọc chi tiết
     if (showFilterDialog) {
         AlertDialog(
             onDismissRequest = { showFilterDialog = false },
@@ -208,7 +200,7 @@ fun FilterAndSortBar(
 }
 
 /**
- * Item Card hiển thị từng Địa điểm Du lịch trong Danh sách
+ * Item Card hiển thị từng Địa điểm trong Danh sách
  */
 @Composable
 fun PlaceCard(
@@ -222,26 +214,39 @@ fun PlaceCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp), // Góc bo lớn hơn
+        shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // Ảnh chiếm phần trên
+        Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(140.dp)
             ) {
-                AsyncImage(
-                    model = place.imageUrl, // imageUrl is not null, fallback is handled in repository
-                    contentDescription = place.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                
-                // Nút yêu thích góc trên phải
+                if (place.imageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = place.imageUrl,
+                        contentDescription = place.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // Google không có ảnh cho địa điểm này
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+
                 IconButton(
                     onClick = onToggleFavorite,
                     modifier = Modifier
@@ -258,7 +263,6 @@ fun PlaceCard(
                     )
                 }
 
-                // Tag góc chụp / nhãn sống ảo
                 if (place.rating > 4.5) {
                     Row(
                         modifier = Modifier
@@ -275,30 +279,23 @@ fun PlaceCard(
                 }
             }
 
-            // Thông tin bên dưới
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        text = place.name,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = NightInk,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                Text(
+                    text = place.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = NightInk,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                place.vicinity?.let {
+                if (!place.vicinity.isNullOrBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Place,
@@ -308,11 +305,28 @@ fun PlaceCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = it,
+                            text = place.vicinity,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                if (place.openingHours.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = LagoonTeal
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = place.openingHours,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -322,26 +336,28 @@ fun PlaceCard(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
-                    // Điểm thưởng / Rating dùng GoldSoft và MangoGold
-                    Row(
-                        modifier = Modifier
-                            .background(GoldSoft, RoundedCornerShape(percent = 50))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Rating",
-                            modifier = Modifier.size(14.dp),
-                            tint = MangoGold
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = place.rating.toString(),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MangoGold
-                        )
+                    // Chỉ hiện rating khi Google có đánh giá
+                    if (place.rating > 0) {
+                        Row(
+                            modifier = Modifier
+                                .background(GoldSoft, RoundedCornerShape(percent = 50))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "Rating",
+                                modifier = Modifier.size(14.dp),
+                                tint = MangoGold
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "%.1f".format(place.rating),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MangoGold
+                            )
+                        }
                     }
 
                     if (place.priceLevel > 0) {
@@ -367,9 +383,6 @@ fun PlaceCard(
     }
 }
 
-/**
- * Trạng thái Đang Tải Dữ Liệu
- */
 @Composable
 fun LoadingStateView(modifier: Modifier = Modifier) {
     Column(
@@ -388,9 +401,6 @@ fun LoadingStateView(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Trạng thái Không Tìm Thấy Kết Quả
- */
 @Composable
 fun EmptyStateView(
     onClearFilters: () -> Unit,
@@ -424,9 +434,6 @@ fun EmptyStateView(
     }
 }
 
-/**
- * Trạng thái Lỗi Kết Nối
- */
 @Composable
 fun ErrorStateView(
     errorMessage: String,
@@ -493,9 +500,9 @@ fun PlaceDetailBottomSheet(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    place.vicinity?.let {
+                    if (!place.vicinity.isNullOrBlank()) {
                         Text(
-                            text = it,
+                            text = place.vicinity,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -505,7 +512,7 @@ fun PlaceDetailBottomSheet(
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Favorite",
-                        tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.outline
+                        tint = if (isFavorite) SunsetCoral else MaterialTheme.colorScheme.outline
                     )
                 }
             }
@@ -519,8 +526,8 @@ fun PlaceDetailBottomSheet(
                 DetailInfoItem(
                     icon = Icons.Default.Star,
                     title = "Đánh giá",
-                    value = "${place.rating} / 5.0",
-                    tint = Color(0xFFFFB800)
+                    value = if (place.rating > 0) "%.1f / 5.0".format(place.rating) else "Chưa rõ",
+                    tint = MangoGold
                 )
                 DetailInfoItem(
                     icon = Icons.Default.ShoppingCart,
@@ -530,8 +537,24 @@ fun PlaceDetailBottomSheet(
                 DetailInfoItem(
                     icon = Icons.Default.Place,
                     title = "Khoảng cách",
-                    value = "${place.distanceInKm} km"
+                    value = if (place.distanceInKm > 0) "${place.distanceInKm} km" else "Chưa rõ"
                 )
+            }
+
+            if (place.openingHours.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = LagoonTeal
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = place.openingHours,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
 
             HorizontalDivider()

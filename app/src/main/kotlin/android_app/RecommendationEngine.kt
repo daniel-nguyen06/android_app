@@ -1,15 +1,19 @@
 package android_app
 
+import com.google.ai.client.generativeai.GenerativeModel
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class RecommendationEngine(
     private val geminiApiKey: String,
-    private val geminiApi: GeminiApiService = GeminiApiService.create(),
     private val placeRepository: PlaceRepository
 ) {
     private val gson = Gson()
+    private val generativeModel = GenerativeModel(
+        modelName = "gemini-pro",
+        apiKey = geminiApiKey
+    )
 
     suspend fun getRecommendations(request: RecommendationRequest): List<RecommendedPlace> = withContext(Dispatchers.IO) {
         // 1. Gọi Gemini AI để chuyển đổi Sở thích -> Chiến lược tìm kiếm
@@ -17,7 +21,6 @@ class RecommendationEngine(
         println(">>> [AI STRATEGY] Cần tìm: '${strategy.keyword}', Danh mục: '${strategy.category}'. Lý do: ${strategy.reasoning}")
 
         // 2. Gọi Geoapify (thông qua PlaceRepository) để tìm địa điểm thực tế
-        // Vì PlaceRepository.fetchPlaces sử dụng AI nội bộ, ta truyền keyword thẳng vào
         val rawPlaces = placeRepository.fetchPlaces(
             keyword = strategy.keyword,
             userLat = request.userLat,
@@ -60,15 +63,14 @@ class RecommendationEngine(
         """.trimIndent()
 
         return try {
-            val requestBody = GeminiRequest(
-                contents = listOf(GeminiContent(parts = listOf(GeminiPart(text = prompt))))
-            )
-            val response = geminiApi.generateContent(apiKey = geminiApiKey, request = requestBody)
-            val rawText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: ""
+            val response = generativeModel.generateContent(prompt)
+            val rawText = response.text.orEmpty()
 
             val cleanJson = rawText.replace("```json", "").replace("```", "").trim()
             gson.fromJson(cleanJson, AiSearchStrategy::class.java) ?: fallbackStrategy(preferences)
         } catch (e: Exception) {
+            e.printStackTrace()
+            println(">>> [LỖI RECOMMENDATION CHI TIẾT]: ${e::class.simpleName} - ${e.message}")
             fallbackStrategy(preferences)
         }
     }
