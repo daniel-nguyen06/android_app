@@ -13,13 +13,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.Color
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import android_app.ui.theme.Lavender
 import android_app.ui.theme.LavenderSoft
 import android_app.ui.theme.MangoGold
@@ -28,7 +29,7 @@ import android_app.ui.theme.SunsetCoral
 import android_app.ui.theme.LagoonTeal
 import android_app.ui.theme.NightInk
 
-// Danh mục địa điểm phổ biến
+// Danh mục địa điểm (id là danh mục của Geoapify)
 data class PlaceCategory(
     val id: String?,
     val label: String,
@@ -44,8 +45,9 @@ val placeCategories = listOf(
     PlaceCategory(id = "commercial.shopping_mall", label = "Mua sắm", Icons.Default.ShoppingCart),
     PlaceCategory(id = "entertainment", label = "Vui chơi", Icons.Default.PlayArrow)
 )
+
 /**
- * Thanh cuộn chọn Danh mục Địa điểm (Category Filter Chips)
+ * Thanh cuộn chọn Danh mục Địa điểm
  */
 @Composable
 fun CategoryChipRow(
@@ -77,7 +79,7 @@ fun CategoryChipRow(
 }
 
 /**
- * Thanh Bộ Lọc Nâng Cao & Tùy Chọn Sắp Xếp
+ * Thanh Bộ Lọc & Sắp Xếp
  */
 @Composable
 fun FilterAndSortBar(
@@ -199,7 +201,41 @@ fun FilterAndSortBar(
 }
 
 /**
- * Item Card hiển thị từng Địa điểm trong Danh sách
+ * Khung dự phòng khi địa điểm không có ảnh: gradient + biểu tượng theo loại
+ */
+@Composable
+fun PlaceImagePlaceholder(types: List<String>, modifier: Modifier = Modifier) {
+    fun has(prefix: String) = types.any { it.startsWith(prefix) }
+
+    val (icon, colors) = when {
+        CITY_PLACE_TYPE in types -> Icons.Default.Explore to listOf(SunsetCoral, MangoGold)
+        has("catering.cafe") -> Icons.Default.LocalCafe to listOf(MangoGold, SunsetCoral)
+        has("catering") -> Icons.Default.Restaurant to listOf(SunsetCoral, MangoGold)
+        has("accommodation") -> Icons.Default.Hotel to listOf(Lavender, LagoonTeal)
+        has("beach") -> Icons.Default.BeachAccess to listOf(LagoonTeal, MangoGold)
+        has("leisure") -> Icons.Default.Park to listOf(LagoonTeal, Lavender)
+        has("commercial") -> Icons.Default.ShoppingCart to listOf(Lavender, SunsetCoral)
+        has("entertainment") -> Icons.Default.Star to listOf(Lavender, SunsetCoral)
+        else -> Icons.Default.Landscape to listOf(LagoonTeal, Lavender)
+    }
+
+    Box(
+        modifier = modifier.background(
+            Brush.linearGradient(colors.map { it.copy(alpha = 0.85f) })
+        ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = Color.White.copy(alpha = 0.9f)
+        )
+    }
+}
+
+/**
+ * Thẻ hiển thị một địa điểm trong danh sách
  */
 @Composable
 fun PlaceCard(
@@ -223,27 +259,16 @@ fun PlaceCard(
                     .height(140.dp)
             ) {
                 if (place.imageUrl.isNotBlank()) {
-                    AsyncImage(
+                    SubcomposeAsyncImage(
                         model = place.imageUrl,
                         contentDescription = place.name,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        loading = { PlaceImagePlaceholder(place.types, Modifier.fillMaxSize()) },
+                        error = { PlaceImagePlaceholder(place.types, Modifier.fillMaxSize()) }
                     )
                 } else {
-                    // Google không có ảnh cho địa điểm này
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Place,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.outline
-                        )
-                    }
+                    PlaceImagePlaceholder(place.types, Modifier.fillMaxSize())
                 }
 
                 IconButton(
@@ -294,6 +319,15 @@ fun PlaceCard(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                if (CITY_PLACE_TYPE in place.types) {
+                    Text(
+                        text = "Điểm đến",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = LagoonTeal
+                    )
+                }
+
                 if (!place.vicinity.isNullOrBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -325,7 +359,9 @@ fun PlaceCard(
                         Text(
                             text = place.openingHours,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -335,7 +371,6 @@ fun PlaceCard(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
-                    // Chỉ hiện rating khi Google có đánh giá
                     if (place.rating > 0) {
                         Row(
                             modifier = Modifier

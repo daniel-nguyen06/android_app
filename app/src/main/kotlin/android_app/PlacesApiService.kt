@@ -87,11 +87,13 @@ interface PlacesApiService {
     }
 }
 
-// ---------------- Wikipedia (ảnh đại diện cho thành phố) ----------------
+// ---------------- Wikipedia (ảnh cho thành phố và địa danh) ----------------
 data class WikiResponse(@SerializedName("query") val query: WikiQuery? = null)
 data class WikiQuery(@SerializedName("pages") val pages: Map<String, WikiPage>? = null)
 data class WikiPage(
     @SerializedName("title") val title: String? = null,
+    /** Thứ tự gần nhất khi tìm theo toạ độ (1 = gần nhất) */
+    @SerializedName("index") val index: Int? = null,
     @SerializedName("thumbnail") val thumbnail: WikiThumbnail? = null
 )
 data class WikiThumbnail(@SerializedName("source") val source: String? = null)
@@ -106,6 +108,19 @@ interface WikipediaApiService {
         @Query("format") format: String = "json",
         @Query("pithumbsize") thumbSize: Int = 800,
         @Query("redirects") redirects: Int = 1
+    ): WikiResponse
+
+    /** Tìm bài viết Wikipedia gần một toạ độ và lấy ảnh đại diện */
+    @GET("w/api.php")
+    suspend fun imageNear(
+        @Query("ggscoord") coord: String,          // "lat|lon"
+        @Query("ggsradius") radius: Int = 200,     // mét
+        @Query("ggslimit") limit: Int = 5,
+        @Query("action") action: String = "query",
+        @Query("generator") generator: String = "geosearch",
+        @Query("prop") prop: String = "pageimages",
+        @Query("format") format: String = "json",
+        @Query("pithumbsize") thumbSize: Int = 600
     ): WikiResponse
 
     companion object {

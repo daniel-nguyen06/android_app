@@ -97,6 +97,11 @@ class PlaceViewModel(
 
                 repository.calculateDistances(results, currentState.userLat, currentState.userLng)
                 rawPlacesList = results
+                applyLocalFiltersAndSort() // hiện danh sách ngay
+
+                // Tải ảnh ở nền rồi cập nhật lại danh sách
+                val enriched = withContext(Dispatchers.IO) { repository.enrichImages(results) }
+                rawPlacesList = enriched
                 applyLocalFiltersAndSort()
 
             } catch (e: CancellationException) {

@@ -2,6 +2,11 @@ package android_app
 
 import com.travel.android_app.BuildConfig
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import retrofit2.HttpException
 import java.util.Locale
 
@@ -19,6 +24,7 @@ class PlaceRepository(
     }
 
     private val wikiCache = mutableMapOf<String, WikipediaApiService>()
+    private val imageCache = mutableMapOf<String, String>()
 
     suspend fun fetchPlaces(
         keyword: String,
@@ -93,7 +99,7 @@ class PlaceRepository(
         }
     }
 
-    /** Lấy ảnh đại diện từ Wikipedia; lỗi hoặc không có ảnh thì trả chuỗi rỗng */
+    /** Lấy ảnh đại diện từ Wikipedia theo tên; lỗi hoặc không có ảnh thì trả chuỗi rỗng */
     private suspend fun fetchWikiImage(title: String, lang: String): String {
         return try {
             val api = wikiCache.getOrPut(lang) { WikipediaApiService.create(lang) }
@@ -105,6 +111,54 @@ class PlaceRepository(
         } catch (e: Exception) {
             ""
         }
+    }
+
+    /**
+     * Bổ sung ảnh từ Wikipedia cho các địa điểm chưa có ảnh (tối đa 12 nơi đầu danh sách).
+     * Lỗi mạng hoặc không có ảnh thì giữ nguyên, không ném lỗi.
+     */
+    suspend fun enrichImages(places: List<PlaceItem>, max: Int = 12): List<PlaceItem> {
+        val targets = places
+            .filter { it.imageUrl.isBlank() && it.geometry?.location != null }
+            .take(max)
+            .map { it.placeId }
+            .toSet()
+        if (targets.isEmpty()) return places
+
+        val lang = Locale.getDefault().language
+        val gate = Semaphore(4) // tối đa 4 yêu cầu song song
+
+        return coroutineScope {
+            places.map { place ->
+                async {
+                    if (place.placeId !in targets) return@async place
+                    imageCache[place.placeId]?.let { cached ->
+                        return@async if (cached.isNotBlank()) place.copy(imageUrl = cached) else place
+                    }
+                    val loc = place.geometry?.location ?: return@async place
+                    val url = gate.withPermit { wikiImageNear(loc.lat, loc.lng, lang) }
+                    imageCache[place.placeId] = url
+                    if (url.isNotBlank()) place.copy(imageUrl = url) else place
+                }
+            }.awaitAll()
+        }
+    }
+
+    private suspend fun wikiImageNear(lat: Double, lng: Double, lang: String): String {
+        suspend fun query(l: String): String = try {
+            val api = wikiCache.getOrPut(l) { WikipediaApiService.create(l) }
+            api.imageNear("$lat|$lng").query?.pages?.values
+                ?.filter { it.thumbnail?.source != null }
+                ?.minByOrNull { it.index ?: Int.MAX_VALUE }
+                ?.thumbnail?.source.orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ""
+        }
+
+        val primary = query(lang)
+        return if (primary.isNotBlank() || lang == "en") primary else query("en")
     }
 
     fun calculateDistances(list: List<PlaceItem>, userLat: Double?, userLng: Double?) {

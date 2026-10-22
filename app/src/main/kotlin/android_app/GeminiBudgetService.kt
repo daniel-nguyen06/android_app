@@ -5,6 +5,7 @@ import com.google.ai.client.generativeai.type.generationConfig
 import com.google.gson.Gson
 import com.travel.android_app.BuildConfig
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 private data class BudgetEstimateDto(
@@ -29,6 +30,10 @@ class GeminiBudgetService(
         }
     )
 
+    private companion object {
+        const val MAX_ATTEMPTS = 4
+    }
+
     suspend fun estimateBudget(
         destination: String,
         days: Int,
@@ -50,26 +55,59 @@ class GeminiBudgetService(
             {"transportCost": 0, "accommodationCost": 0, "foodCost": 0, "entertainmentCost": 0, "summaryAdvice": "1-2 câu lời khuyên tiết kiệm"}
         """.trimIndent()
 
-        try {
-            val raw = generativeModel.generateContent(promptText).text.orEmpty()
-            val clean = raw.replace("```json", "").replace("```", "").trim()
-            val dto = gson.fromJson(clean, BudgetEstimateDto::class.java)
-                ?: throw IllegalStateException("Gemini trả về dữ liệu rỗng")
+        var lastError: Exception? = null
 
-            val total = dto.transportCost + dto.accommodationCost + dto.foodCost + dto.entertainmentCost
-            return BudgetBreakdown(
-                transportCost = formatVnd(dto.transportCost),
-                accommodationCost = formatVnd(dto.accommodationCost),
-                foodCost = formatVnd(dto.foodCost),
-                entertainmentCost = formatVnd(dto.entertainmentCost),
-                totalEstimated = formatVnd(total),
-                summaryAdvice = dto.summaryAdvice
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            println(">>> [Gemini Budget lỗi] ${e::class.simpleName}: ${e.message}")
-            throw IllegalStateException("Không tính được ngân sách: ${e.message}")
+        for (attempt in 1..MAX_ATTEMPTS) {
+            try {
+                val raw = generativeModel.generateContent(promptText).text.orEmpty()
+                val clean = raw.replace("```json", "").replace("```", "").trim()
+                val dto = gson.fromJson(clean, BudgetEstimateDto::class.java)
+                    ?: throw IllegalStateException("Gemini trả về dữ liệu rỗng")
+
+                val total = dto.transportCost + dto.accommodationCost +
+                        dto.foodCost + dto.entertainmentCost
+                return BudgetBreakdown(
+                    transportCost = formatVnd(dto.transportCost),
+                    accommodationCost = formatVnd(dto.accommodationCost),
+                    foodCost = formatVnd(dto.foodCost),
+                    entertainmentCost = formatVnd(dto.entertainmentCost),
+                    totalEstimated = formatVnd(total),
+                    summaryAdvice = dto.summaryAdvice
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                lastError = e
+                println(">>> [Gemini Budget] lần $attempt lỗi: ${e::class.simpleName}: ${e.message}")
+                if (attempt < MAX_ATTEMPTS && isTransient(e)) {
+                    delay(1500L * attempt) // 1.5s, 3s, 4.5s
+                } else {
+                    break
+                }
+            }
+        }
+
+        throw IllegalStateException(friendlyMessage(lastError))
+    }
+
+    /** Lỗi tạm thời của server (quá tải, hết hạn mức tức thời, mạng) nên đáng thử lại */
+    private fun isTransient(e: Exception): Boolean {
+        val msg = (e.message.orEmpty() + " " + e.cause?.message.orEmpty()).lowercase()
+        return "503" in msg || "unavailable" in msg || "high demand" in msg ||
+                "overloaded" in msg || "timeout" in msg || "timed out" in msg ||
+                "unable to resolve host" in msg || "missingfieldexception" in msg
+    }
+
+    private fun friendlyMessage(e: Exception?): String {
+        val msg = (e?.message.orEmpty() + " " + e?.cause?.message.orEmpty()).lowercase()
+        return when {
+            "503" in msg || "unavailable" in msg || "high demand" in msg || "missingfieldexception" in msg ->
+                "Dịch vụ AI đang quá tải. Vui lòng thử lại sau ít phút."
+            "429" in msg || "quota" in msg ->
+                "Đã hết hạn mức gọi AI. Vui lòng thử lại sau."
+            "unable to resolve host" in msg ->
+                "Không có kết nối mạng."
+            else -> "Không tính được ngân sách. Vui lòng thử lại."
         }
     }
 

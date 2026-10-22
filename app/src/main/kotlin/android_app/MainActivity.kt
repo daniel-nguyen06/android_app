@@ -13,8 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import android_app.ui.theme.TravelAppTheme
+import coil.Coil
+import coil.ImageLoader
 import com.travel.android_app.BuildConfig
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 
 class MainActivity : ComponentActivity() {
 
@@ -24,12 +27,29 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        // Chỉ cần một trong hai quyền (chính xác hoặc xấp xỉ) là đủ
         if (permissions.values.any { it }) fetchUserLocation()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Coil gửi User-Agent riêng để Wikipedia/Wikimedia không chặn ảnh
+        Coil.setImageLoader(
+            ImageLoader.Builder(applicationContext)
+                .okHttpClient {
+                    OkHttpClient.Builder()
+                        .addInterceptor { chain ->
+                            chain.proceed(
+                                chain.request().newBuilder()
+                                    .header("User-Agent", "TravelApp/1.0 (Android)")
+                                    .build()
+                            )
+                        }
+                        .build()
+                }
+                .crossfade(true)
+                .build()
+        )
 
         val aiParser = AiQueryParser(geminiApiKey = BuildConfig.GEMINI_API_KEY)
         val budgetService = GeminiBudgetService(geminiApiKey = BuildConfig.GEMINI_API_KEY)
