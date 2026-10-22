@@ -16,14 +16,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import coil.compose.AsyncImage
 import androidx.compose.ui.unit.dp
 
 import android_app.TripViewModel
+import android_app.ui.theme.SunsetCoral
+import android_app.ui.theme.LagoonTeal
+import android_app.ui.theme.SandCream
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +52,32 @@ fun CreateTripScreen(
     var startDate by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
     var days by remember { mutableStateOf("") }
+    
+    // States for Date Pickers
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+    
+    val focusManager = LocalFocusManager.current
+
+    // Hàm phụ trợ để tính số ngày tự động
+    fun calculateDays(start: String, end: String) {
+        if (start.isNotBlank() && end.isNotBlank()) {
+            try {
+                val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                val startD = LocalDate.parse(start, formatter)
+                val endD = LocalDate.parse(end, formatter)
+                
+                val daysBetween = ChronoUnit.DAYS.between(startD, endD)
+                if (daysBetween >= 0) {
+                    days = (daysBetween + 1).toString() // Đi về cùng ngày tính là 1 ngày
+                } else {
+                    days = "0" // Lỗi logic ngày (ngày về trước ngày đi)
+                }
+            } catch (e: Exception) {
+                // Ignore parse errors while typing/formatting
+            }
+        }
+    }
     
     // Xử lý thành công
     LaunchedEffect(uiState.createTripSuccess) {
@@ -73,7 +112,11 @@ fun CreateTripScreen(
                     }
                 },
                 icon = { Icon(Icons.Default.Title, contentDescription = null) },
-                text = { Text("Lưu chuyến đi") }
+                text = { Text("Lưu chuyến đi", fontWeight = FontWeight.Bold) },
+                containerColor = SunsetCoral,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(percent = 50), // Bo tròn hoàn toàn
+                modifier = Modifier.shadow(8.dp, shape = RoundedCornerShape(percent = 50), spotColor = SunsetCoral, ambientColor = SunsetCoral)
             )
         },
         modifier = modifier
@@ -86,42 +129,45 @@ fun CreateTripScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Header Image Placeholder
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                shape = MaterialTheme.shapes.large,
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            // Welcome Banner (Thay thế ảnh bìa)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = SandCream,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    AsyncImage(
-                        model = "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=800&auto=format&fit=crop",
-                        contentDescription = "Cover Image",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Default.Image,
+                                imageVector = Icons.Default.FlightTakeoff,
                                 contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = Color.White
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Thay đổi ảnh bìa",
-                                color = Color.White,
-                                fontWeight = FontWeight.Medium
+                                tint = SunsetCoral,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "Lên kế hoạch mới",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Ghi lại những hành trình đáng nhớ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -134,7 +180,14 @@ fun CreateTripScreen(
                 placeholder = { Text("VD: Trải nghiệm thanh xuân") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Title, contentDescription = null) }
+                leadingIcon = { Icon(Icons.Default.Title, contentDescription = null, tint = LagoonTeal) },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    focusedBorderColor = LagoonTeal
+                )
             )
             
             // Destination Input
@@ -145,7 +198,14 @@ fun CreateTripScreen(
                 placeholder = { Text("VD: Đà Lạt, Nha Trang") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Place, contentDescription = null) }
+                leadingIcon = { Icon(Icons.Default.Place, contentDescription = null, tint = LagoonTeal) },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    focusedBorderColor = LagoonTeal
+                )
             )
 
             // Date Selection
@@ -159,32 +219,69 @@ fun CreateTripScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // START DATE FIELD
+                val startInteractionSource = remember { MutableInteractionSource() }
+                if (startInteractionSource.collectIsPressedAsState().value) {
+                    showStartDatePicker = true
+                }
+                
                 OutlinedTextField(
                     value = startDate,
-                    onValueChange = { startDate = it },
+                    onValueChange = { },
                     label = { Text("Ngày đi") },
                     modifier = Modifier.weight(1f),
-                    readOnly = true,
-                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) }
+                    readOnly = true, // Prevent keyboard from showing
+                    interactionSource = startInteractionSource,
+                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, tint = LagoonTeal) },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        focusedBorderColor = LagoonTeal
+                    )
                 )
+                
+                // END DATE FIELD
+                val endInteractionSource = remember { MutableInteractionSource() }
+                if (endInteractionSource.collectIsPressedAsState().value) {
+                    showEndDatePicker = true
+                }
                 
                 OutlinedTextField(
                     value = endDate,
-                    onValueChange = { endDate = it },
+                    onValueChange = { },
                     label = { Text("Ngày về") },
                     modifier = Modifier.weight(1f),
-                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) }
+                    readOnly = true, // Prevent keyboard from showing
+                    interactionSource = endInteractionSource,
+                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = null, tint = LagoonTeal) },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        focusedBorderColor = LagoonTeal
+                    )
                 )
             }
             
             OutlinedTextField(
                 value = days,
-                onValueChange = { days = it },
+                onValueChange = { },
                 label = { Text("Tổng số ngày") },
-                placeholder = { Text("VD: 3") },
+                placeholder = { Text("Tự động tính") },
+                readOnly = true, // Auto-calculated
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                trailingIcon = { Icon(Icons.Default.Timer, contentDescription = null) }
+                trailingIcon = { Icon(Icons.Default.Timer, contentDescription = null, tint = LagoonTeal) },
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    focusedContainerColor = Color.White,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    focusedBorderColor = LagoonTeal
+                )
             )
             
             if (uiState.isLoading) {
@@ -197,6 +294,67 @@ fun CreateTripScreen(
             }
             
             Spacer(modifier = Modifier.height(64.dp)) // Spacing for FAB
+        }
+        
+        // --- DATE PICKER DIALOGS ---
+        if (showStartDatePicker) {
+            val datePickerState = rememberDatePickerState()
+            DatePickerDialog(
+                onDismissRequest = { showStartDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                            startDate = localDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                            calculateDays(startDate, endDate)
+                        }
+                        showStartDatePicker = false
+                        focusManager.clearFocus()
+                    }) {
+                        Text("Chọn")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { 
+                        showStartDatePicker = false
+                        focusManager.clearFocus()
+                    }) {
+                        Text("Hủy")
+                    }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
+        }
+
+        if (showEndDatePicker) {
+            val datePickerState = rememberDatePickerState()
+            DatePickerDialog(
+                onDismissRequest = { showEndDatePicker = false },
+                confirmButton = {
+                    TextButton(onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val localDate = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                            endDate = localDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                            calculateDays(startDate, endDate)
+                        }
+                        showEndDatePicker = false
+                        focusManager.clearFocus()
+                    }) {
+                        Text("Chọn")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { 
+                        showEndDatePicker = false 
+                        focusManager.clearFocus()
+                    }) {
+                        Text("Hủy")
+                    }
+                }
+            ) {
+                DatePicker(state = datePickerState)
+            }
         }
     }
 }

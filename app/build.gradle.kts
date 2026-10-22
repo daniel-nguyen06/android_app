@@ -46,6 +46,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true // Cần thiết cho java.time
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
@@ -72,6 +73,8 @@ android {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") // Thư viện Desugaring cho Java.time
+    
     implementation("com.google.android.gms:play-services-location:21.0.1")
     // AndroidX & Jetpack Compose (Giao diện Android của bạn UI)
     implementation("androidx.core:core-ktx:1.12.0")
