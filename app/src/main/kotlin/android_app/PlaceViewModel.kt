@@ -4,6 +4,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,15 +19,102 @@ class PlaceViewModel(
     private val repository: PlaceRepository,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main + Job())
 ) {
+    private companion object {
+        const val NEARBY_SECTION_COUNT = 4
+        const val RELOAD_DISTANCE_KM = 1.0
+    }
+
     private val _uiState = MutableStateFlow(PlaceUiState())
     val uiState: StateFlow<PlaceUiState> = _uiState.asStateFlow()
 
     private var loadDataJob: Job? = null
     private var searchJob: Job? = null
+    private var nearbyJob: Job? = null
+    private var nearbyLoadedFor: Pair<Double, Double>? = null
     private var rawPlacesList: List<PlaceItem> = emptyList()
 
+    /** Gọi khi có vị trí mới; tự tải gợi ý quanh người dùng nếu chưa có hoặc đã di chuyển xa */
     fun updateUserLocation(lat: Double, lng: Double) {
         _uiState.update { it.copy(userLat = lat, userLng = lng) }
+        val last = nearbyLoadedFor
+        if (last == null || haversineKm(last.first, last.second, lat, lng) > RELOAD_DISTANCE_KM) {
+            loadNearby()
+        }
+    }
+
+    /** Tải các nhóm địa điểm quanh vị trí người dùng */
+    fun loadNearby() {
+        val s = _uiState.value
+        val lat = s.userLat ?: return
+        val lng = s.userLng ?: return
+
+        nearbyJob?.cancel()
+        nearbyJob = scope.launch {
+            _uiState.update { it.copy(nearbyLoading = true, nearbyError = null) }
+            try {
+                val categories = placeCategories
+                    .mapNotNull { c -> c.id?.let { id -> c.label to id } }
+                    .take(NEARBY_SECTION_COUNT)
+
+                var firstError: String? = null
+
+                val (area, sections) = withContext(Dispatchers.IO) {
+                    coroutineScope {
+                        val areaJob = async { repository.reverseAreaName(lat, lng) }
+                        val sectionJobs = categories.map { (label, id) ->
+                            async {
+                                try {
+                                    NearbySection(id, label, repository.fetchNearby(id, lat, lng))
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    println(">>> [Nearby] $label lỗi: ${e.message}")
+                                    if (firstError == null) firstError = e.localizedMessage
+                                    NearbySection(id, label, emptyList())
+                                }
+                            }
+                        }
+                        areaJob.await() to sectionJobs.awaitAll()
+                    }
+                }
+
+                val nonEmpty = sections.filter { it.places.isNotEmpty() }
+                nearbyLoadedFor = lat to lng
+                _uiState.update {
+                    it.copy(
+                        areaName = area,
+                        nearbySections = nonEmpty,
+                        nearbyLoading = false,
+                        nearbyError = if (nonEmpty.isEmpty()) firstError else null
+                    )
+                }
+
+                // Tải ảnh ở nền rồi cập nhật lại các nhóm
+                if (nonEmpty.isNotEmpty()) {
+                    val flat = nonEmpty.flatMap { it.places }.distinctBy { it.placeId }
+                    val enriched = withContext(Dispatchers.IO) {
+                        repository.enrichImages(flat, max = 24)
+                    }.associateBy { it.placeId }
+
+                    _uiState.update { st ->
+                        st.copy(
+                            nearbySections = st.nearbySections.map { sec ->
+                                sec.copy(places = sec.places.map { p -> enriched[p.placeId] ?: p })
+                            }
+                        )
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        nearbyLoading = false,
+                        nearbyError = e.localizedMessage ?: "Không thể tải địa điểm quanh bạn."
+                    )
+                }
+            }
+        }
     }
 
     fun onEvent(event: PlaceUiEvent) {
@@ -99,7 +189,6 @@ class PlaceViewModel(
                 rawPlacesList = results
                 applyLocalFiltersAndSort() // hiện danh sách ngay
 
-                // Tải ảnh ở nền rồi cập nhật lại danh sách
                 val enriched = withContext(Dispatchers.IO) { repository.enrichImages(results) }
                 rawPlacesList = enriched
                 applyLocalFiltersAndSort()
@@ -136,6 +225,7 @@ class PlaceViewModel(
             } else {
                 ids.add(placeId)
                 val place = rawPlacesList.find { it.placeId == placeId }
+                    ?: state.nearbySections.flatMap { it.places }.find { it.placeId == placeId }
                     ?: state.selectedPlace?.takeIf { it.placeId == placeId }
                 if (place != null) places[placeId] = place
             }

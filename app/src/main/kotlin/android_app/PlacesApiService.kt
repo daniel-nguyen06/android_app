@@ -24,6 +24,7 @@ data class GeoapifyProperties(
     @SerializedName("place_id") val placeId: String? = null,
     @SerializedName("name") val name: String? = null,
     @SerializedName("city") val city: String? = null,
+    @SerializedName("county") val county: String? = null,
     @SerializedName("state") val state: String? = null,
     @SerializedName("country") val country: String? = null,
     @SerializedName("result_type") val resultType: String? = null,
@@ -59,6 +60,14 @@ interface PlacesApiService {
         @Query("text") text: String,
         @Query("lang") lang: String? = null,
         @Query("limit") limit: Int = 1
+    ): GeoapifyResponse
+
+    /** Từ toạ độ lấy ra tên khu vực (thành phố, huyện, tỉnh) */
+    @GET("v1/geocode/reverse")
+    suspend fun reverseGeocode(
+        @Query("lat") lat: Double,
+        @Query("lon") lon: Double,
+        @Query("lang") lang: String? = null
     ): GeoapifyResponse
 
     companion object {
@@ -114,13 +123,13 @@ interface WikipediaApiService {
     @GET("w/api.php")
     suspend fun imageNear(
         @Query("ggscoord") coord: String,          // "lat|lon"
-        @Query("ggsradius") radius: Int = 200,     // mét
+        @Query("ggsradius") radius: Int = 300,     // mét
         @Query("ggslimit") limit: Int = 5,
         @Query("action") action: String = "query",
         @Query("generator") generator: String = "geosearch",
         @Query("prop") prop: String = "pageimages",
         @Query("format") format: String = "json",
-        @Query("pithumbsize") thumbSize: Int = 600
+        @Query("pithumbsize") thumbSize: Int = 800
     ): WikiResponse
 
     companion object {

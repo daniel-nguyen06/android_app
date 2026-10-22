@@ -6,6 +6,8 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.travel.android_app.BuildConfig
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import java.util.concurrent.ConcurrentHashMap
 
 data class ParsedPlaceQuery(
     @SerializedName("categories") val categories: String? = null,
@@ -31,9 +33,29 @@ class AiQueryParser(
         }
     )
 
+    private companion object {
+        const val MAX_ATTEMPTS = 3
+        const val QUOTA_COOLDOWN_MS = 60_000L
+    }
+
+    // Kết quả đã phân tích: gõ lại cùng từ khóa thì không tốn thêm lượt gọi
+    private val cache = ConcurrentHashMap<String, ParsedPlaceQuery>()
+
+    // Hết hạn mức thì tạm nghỉ, không gọi tiếp cho đến thời điểm này
+    @Volatile
+    private var quotaCooldownUntil = 0L
+
     suspend fun parseUserPrompt(userInput: String): ParsedPlaceQuery {
         val input = userInput.trim()
         if (input.isEmpty()) return ParsedPlaceQuery()
+
+        val key = input.lowercase()
+        cache[key]?.let { return it }
+
+        if (System.currentTimeMillis() < quotaCooldownUntil) {
+            println(">>> [Gemini] đang tạm nghỉ do hết hạn mức, dùng chế độ dự phòng")
+            return fallback(input)
+        }
 
         val promptText = """
             Bạn giúp ứng dụng du lịch chuyển câu người dùng thành tham số tìm kiếm địa điểm.
@@ -49,20 +71,38 @@ class AiQueryParser(
             Chỉ trả về JSON: {"categories": "...", "name": null, "location": null, "nearby": false, "destinationOnly": false}
         """.trimIndent()
 
-        return try {
-            val raw = generativeModel.generateContent(promptText).text.orEmpty()
-            val clean = raw.replace("```json", "").replace("```", "").trim()
-            val parsed = gson.fromJson(clean, ParsedPlaceQuery::class.java)
-            if (parsed == null || parsed.categories.isNullOrBlank()) fallback(input) else parsed
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            println(">>> [Gemini lỗi] ${e::class.simpleName}: ${e.message}")
-            fallback(input)
+        for (attempt in 1..MAX_ATTEMPTS) {
+            try {
+                val raw = generativeModel.generateContent(promptText).text.orEmpty()
+                val clean = raw.replace("```json", "").replace("```", "").trim()
+                val parsed = gson.fromJson(clean, ParsedPlaceQuery::class.java)
+                if (parsed == null || parsed.categories.isNullOrBlank()) return fallback(input)
+
+                cache[key] = parsed
+                return parsed
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val msg = (e.message.orEmpty() + " " + e.cause?.message.orEmpty()).lowercase()
+                println(">>> [Gemini lỗi] lần $attempt: ${e::class.simpleName}: ${e.message}")
+
+                if ("429" in msg || "quota" in msg || "resource_exhausted" in msg) {
+                    quotaCooldownUntil = System.currentTimeMillis() + QUOTA_COOLDOWN_MS
+                    return fallback(input)
+                }
+                val transient = "503" in msg || "unavailable" in msg || "high demand" in msg ||
+                        "overloaded" in msg || "timeout" in msg || "missingfieldexception" in msg
+                if (attempt < MAX_ATTEMPTS && transient) {
+                    delay(1000L * attempt)
+                } else {
+                    return fallback(input)
+                }
+            }
         }
+        return fallback(input)
     }
 
-    // Gemini lỗi: coi nguyên văn là tên địa danh
+    // Gemini không dùng được: coi nguyên văn là tên địa danh. Kết quả dự phòng không được nhớ lại.
     private fun fallback(input: String) = ParsedPlaceQuery(
         categories = "tourism.sights,beach,leisure.park,entertainment.culture",
         location = input,

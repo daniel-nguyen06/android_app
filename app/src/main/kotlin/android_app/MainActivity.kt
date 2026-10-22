@@ -86,6 +86,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Quay lại app (ví dụ sau khi bật định vị) mà chưa có vị trí thì thử lại
+        if (hasLocationPermission() && placeViewModel.uiState.value.userLat == null) {
+            fetchUserLocation()
+        }
+    }
+
     private fun hasLocationPermission(): Boolean {
         val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
         val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)

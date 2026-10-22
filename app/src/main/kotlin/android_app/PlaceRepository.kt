@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import retrofit2.HttpException
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 class PlaceRepository(
     private val apiService: PlacesApiService = PlacesApiService.create(),
@@ -19,12 +20,63 @@ class PlaceRepository(
 
     private companion object {
         const val NEARBY_RADIUS_METERS = 5000
+        const val EXPLORE_RADIUS_METERS = 8000
         const val AREA_FALLBACK_RADIUS_METERS = 10000
+        const val AREA_WIDE_RADIUS_METERS = 15000
+        const val MIN_RESULTS = 6
         const val DEFAULT_CATEGORIES = "tourism.sights,beach,leisure.park,entertainment.culture"
     }
 
-    private val wikiCache = mutableMapOf<String, WikipediaApiService>()
-    private val imageCache = mutableMapOf<String, String>()
+    private val wikiCache = ConcurrentHashMap<String, WikipediaApiService>()
+    private val imageCache = ConcurrentHashMap<String, String>()
+
+    // ------------------------------------------------------------------
+    // GỢI Ý QUANH NGƯỜI DÙNG
+    // ------------------------------------------------------------------
+
+    /** Địa điểm thuộc một nhóm danh mục trong bán kính quanh vị trí người dùng, gần nhất trước */
+    suspend fun fetchNearby(
+        categories: String,
+        userLat: Double,
+        userLng: Double,
+        radiusMeters: Int = EXPLORE_RADIUS_METERS,
+        limit: Int = 12
+    ): List<PlaceItem> {
+        try {
+            val features = apiService.searchPlaces(
+                categories = categories,
+                filter = "circle:$userLng,$userLat,$radiusMeters",
+                bias = "proximity:$userLng,$userLat",
+                lang = Locale.getDefault().language,
+                limit = limit
+            ).features.orEmpty()
+
+            return features
+                .mapNotNull { it.toPlaceItem(userLat, userLng) }
+                .distinctBy { it.placeId }
+                .sortedBy { it.distanceInKm }
+        } catch (e: HttpException) {
+            val body = e.response()?.errorBody()?.string().orEmpty().take(200)
+            throw IllegalStateException("Geoapify: HTTP ${e.code()} $body".trim())
+        }
+    }
+
+    /** Tên khu vực (thành phố/huyện/tỉnh) tại toạ độ; lỗi thì trả null */
+    suspend fun reverseAreaName(lat: Double, lng: Double): String? {
+        return try {
+            val p = apiService.reverseGeocode(lat, lng, Locale.getDefault().language)
+                .features.orEmpty().firstOrNull()?.properties
+            listOfNotNull(p?.city, p?.county, p?.state).firstOrNull { it.isNotBlank() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // TÌM KIẾM THEO TỪ KHÓA
+    // ------------------------------------------------------------------
 
     suspend fun fetchPlaces(
         keyword: String,
@@ -39,10 +91,14 @@ class PlaceRepository(
             val parsed = aiParser.parseUserPrompt(trimmed)
             val lang = Locale.getDefault().language
             val categories = categoryType ?: parsed.categories ?: DEFAULT_CATEGORIES
+            val nameFilter = parsed.name?.takeIf { it.isNotBlank() }
 
             var filter: String? = null
             var bias: String? = null
             var cityItem: PlaceItem? = null
+            // Tâm khu vực tìm kiếm, dùng để mở rộng khi ít kết quả
+            var centerLat: Double? = null
+            var centerLon: Double? = null
 
             if (parsed.nearby && userLat != null && userLng != null) {
                 filter = "circle:$userLng,$userLat,$NEARBY_RADIUS_METERS"
@@ -53,8 +109,13 @@ class PlaceRepository(
                 if (geo == null || gp?.lat == null || gp.lon == null) {
                     throw IllegalStateException("Không tìm thấy khu vực \"${parsed.location}\"")
                 }
+                centerLat = gp.lat
+                centerLon = gp.lon
+
+                // Chỉ dùng khung vùng cho thành phố/tỉnh; các kết quả khác (tên mơ hồ,
+                // công trình...) có khung rất nhỏ nên dùng vòng tròn quanh điểm
                 val b = geo.bbox
-                filter = if (b != null && b.size == 4) {
+                filter = if (geo.isCityLike() && b != null && b.size == 4) {
                     "rect:${b[0]},${b[1]},${b[2]},${b[3]}"
                 } else {
                     "circle:${gp.lon},${gp.lat},$AREA_FALLBACK_RADIUS_METERS"
@@ -62,7 +123,7 @@ class PlaceRepository(
                 bias = "proximity:${gp.lon},${gp.lat}"
 
                 // Chỉ nhập tên địa danh -> ghim thẻ thành phố ở đầu danh sách
-                if (parsed.destinationOnly && parsed.name.isNullOrBlank() && geo.isCityLike()) {
+                if (parsed.destinationOnly && nameFilter == null && geo.isCityLike()) {
                     val image = fetchWikiImage(geo.areaName() ?: parsed.location, lang)
                     cityItem = geo.toCityItem(image, userLat, userLng)
                 }
@@ -73,18 +134,32 @@ class PlaceRepository(
                 throw IllegalStateException("Hãy nhập khu vực muốn tìm (ví dụ: cà phê Nha Trang) hoặc bật vị trí.")
             }
 
-            println(">>> [Places] categories=$categories, name=${parsed.name}, filter=$filter, city=${cityItem?.name}")
+            println(">>> [Places] categories=$categories, name=$nameFilter, filter=$filter, city=${cityItem?.name}")
 
-            val features = apiService.searchPlaces(
+            var features = apiService.searchPlaces(
                 categories = categories,
                 filter = filter,
                 bias = bias,
-                name = parsed.name?.takeIf { it.isNotBlank() },
+                name = nameFilter,
                 lang = lang
             ).features.orEmpty()
             println(">>> [Geoapify] count=${features.size}")
 
+            // Ít kết quả quá thì mở rộng ra vòng tròn lớn hơn quanh tâm khu vực
+            if (features.size < MIN_RESULTS && centerLat != null && centerLon != null) {
+                val wide = apiService.searchPlaces(
+                    categories = categories,
+                    filter = "circle:$centerLon,$centerLat,$AREA_WIDE_RADIUS_METERS",
+                    bias = "proximity:$centerLon,$centerLat",
+                    name = nameFilter,
+                    lang = lang
+                ).features.orEmpty()
+                println(">>> [Geoapify] mở rộng, count=${wide.size}")
+                if (wide.size > features.size) features = wide
+            }
+
             val places = features.mapNotNull { it.toPlaceItem(userLat, userLng) }
+                .distinctBy { it.placeId }
             return listOfNotNull(cityItem) + places
 
         } catch (e: CancellationException) {
@@ -98,6 +173,10 @@ class PlaceRepository(
             throw e
         }
     }
+
+    // ------------------------------------------------------------------
+    // ẢNH TỪ WIKIPEDIA
+    // ------------------------------------------------------------------
 
     /** Lấy ảnh đại diện từ Wikipedia theo tên; lỗi hoặc không có ảnh thì trả chuỗi rỗng */
     private suspend fun fetchWikiImage(title: String, lang: String): String {
@@ -114,7 +193,7 @@ class PlaceRepository(
     }
 
     /**
-     * Bổ sung ảnh từ Wikipedia cho các địa điểm chưa có ảnh (tối đa 12 nơi đầu danh sách).
+     * Bổ sung ảnh từ Wikipedia cho các địa điểm chưa có ảnh (tối đa [max] nơi đầu danh sách).
      * Lỗi mạng hoặc không có ảnh thì giữ nguyên, không ném lỗi.
      */
     suspend fun enrichImages(places: List<PlaceItem>, max: Int = 12): List<PlaceItem> {
@@ -136,12 +215,28 @@ class PlaceRepository(
                         return@async if (cached.isNotBlank()) place.copy(imageUrl = cached) else place
                     }
                     val loc = place.geometry?.location ?: return@async place
-                    val url = gate.withPermit { wikiImageNear(loc.lat, loc.lng, lang) }
+                    val url = gate.withPermit {
+                        // 1) theo toạ độ, 2) nếu không có thì theo tên (chỉ với địa danh du lịch)
+                        wikiImageNear(loc.lat, loc.lng, lang)
+                            .ifBlank { if (canLookupByName(place)) wikiImageByName(place.name, lang) else "" }
+                    }
                     imageCache[place.placeId] = url
                     if (url.isNotBlank()) place.copy(imageUrl = url) else place
                 }
             }.awaitAll()
         }
+    }
+
+    /** Tên quán cà phê, nhà hàng, khách sạn dễ trùng bài viết khác nên không tra theo tên */
+    private fun canLookupByName(place: PlaceItem): Boolean =
+        place.types.any {
+            it.startsWith("tourism") || it.startsWith("beach") ||
+                    it.startsWith("leisure") || it.startsWith("entertainment")
+        }
+
+    private suspend fun wikiImageByName(name: String, lang: String): String {
+        val primary = fetchWikiImage(name, lang)
+        return if (primary.isNotBlank() || lang == "en") primary else fetchWikiImage(name, "en")
     }
 
     private suspend fun wikiImageNear(lat: Double, lng: Double, lang: String): String {
@@ -160,6 +255,10 @@ class PlaceRepository(
         val primary = query(lang)
         return if (primary.isNotBlank() || lang == "en") primary else query("en")
     }
+
+    // ------------------------------------------------------------------
+    // LỌC / SẮP XẾP / KHOẢNG CÁCH
+    // ------------------------------------------------------------------
 
     fun calculateDistances(list: List<PlaceItem>, userLat: Double?, userLng: Double?) {
         if (userLat == null || userLng == null) return

@@ -8,6 +8,13 @@ sealed interface PlaceScreenStatus {
     data class Error(val message: String) : PlaceScreenStatus
 }
 
+/** Một nhóm địa điểm gần người dùng (ví dụ: Tham quan, Cà phê) */
+data class NearbySection(
+    val categoryId: String,
+    val title: String,
+    val places: List<PlaceItem>
+)
+
 data class PlaceUiState(
     val searchQuery: String = "",
     val selectedCategory: String? = null,
@@ -24,5 +31,11 @@ data class PlaceUiState(
     val favoritePlaces: Map<String, PlaceItem> = emptyMap(),
 
     val selectedPlace: PlaceItem? = null,
-    val status: PlaceScreenStatus = PlaceScreenStatus.Idle
+    val status: PlaceScreenStatus = PlaceScreenStatus.Idle,
+
+    // --- Gợi ý quanh người dùng ---
+    val areaName: String? = null,
+    val nearbySections: List<NearbySection> = emptyList(),
+    val nearbyLoading: Boolean = false,
+    val nearbyError: String? = null
 )
